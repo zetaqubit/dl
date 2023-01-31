@@ -1,5 +1,6 @@
 """Implementation of the transformer from Attention is All You Need."""
 
+from einops import rearrange
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
@@ -102,3 +103,18 @@ class GPT(nn.Module):
     x = self.transformers(x)
     x = self.lm_head(x)
     return x
+
+
+class AutoregressiveModel(nn.Module):
+  def __init__(self, net: nn.Module, ignore_index=-100):
+    super().__init__()
+    self.net = net
+    self.ignore_index = ignore_index
+
+  def forward(self, x):  # [batch, seq] -> loss
+    inputs, targets = x[:, :-1], x[:, 1:]
+    logits = self.net(inputs)
+    logits = rearrange(logits, 'b s v -> (b s) v')
+    targets = rearrange(targets, 'b s -> (b s)')
+    loss = F.cross_entropy(logits, targets, ignore_index=self.ignore_index)
+    return loss
