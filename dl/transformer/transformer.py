@@ -92,6 +92,7 @@ class AbsolutePositionalEmbedding(nn.Module):
 class GPT(nn.Module):
   def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
     super().__init__()
+    self.max_seq_len = max_seq_len
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
     self.wpe = AbsolutePositionalEmbedding(dim, max_seq_len)
     self.transformers = Decoder(n_layers, dim)
@@ -110,6 +111,7 @@ class AutoregressiveModel(nn.Module):
     super().__init__()
     self.net = net
     self.ignore_index = ignore_index
+    self.max_seq_len = net.max_seq_len
 
   def forward(self, x):  # [batch, seq] -> loss
     inputs, targets = x[:, :-1], x[:, 1:]
@@ -118,3 +120,25 @@ class AutoregressiveModel(nn.Module):
     targets = rearrange(targets, 'b s -> (b s)')
     loss = F.cross_entropy(logits, targets, ignore_index=self.ignore_index)
     return loss
+
+  def generate(self,
+               prompt,
+               seq_len,
+               temperature=1,
+               ):  # [batch, seq] -> [batch, seq_len]
+    was_training = self.net.training
+    self.net.eval()
+
+    b, t = prompt.shape
+    out = prompt
+    for _ in range(seq_len):
+      x = out[:, -self.max_seq_len:]
+      logits = self.net(x)[:, -1]
+      probs = F.softmax(logits / temperature, dim=-1)
+      sample = torch.multinomial(probs, 1)
+      out = torch.cat((out, sample), dim=-1)
+      # todo: handle eos and break
+
+    out = out[:, t:]
+    self.net.train(was_training)
+    return out
