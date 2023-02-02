@@ -1,11 +1,13 @@
 """Implementation of the transformer from Attention is All You Need."""
 
+import gin
 from einops import rearrange
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
 
 
+@gin.configurable
 class SelfAttention(nn.Module):
   def __init__(self, dim, causal=False):
     super().__init__()
@@ -34,6 +36,7 @@ class SelfAttention(nn.Module):
     return summed
 
 
+@gin.configurable
 class TransformerBlock(nn.Module):
   def __init__(self, dim: int, causal: bool):
     super().__init__()
@@ -48,6 +51,7 @@ class TransformerBlock(nn.Module):
     return x
 
 
+@gin.configurable
 class Encoder(nn.Module):
   def __init__(self, n_layers, dim):
     super().__init__()
@@ -59,6 +63,7 @@ class Encoder(nn.Module):
     return self.encoder_stack(x)
 
 
+@gin.configurable
 class Decoder(nn.Module):
   """Decoder stack with causal attention.
 
@@ -74,6 +79,7 @@ class Decoder(nn.Module):
     return self.decoder_stack(x)
 
 
+@gin.configurable
 class AbsolutePositionalEmbedding(nn.Module):
   def __init__(self, dim: int, max_seq_len: int):
     super().__init__()
@@ -89,6 +95,7 @@ class AbsolutePositionalEmbedding(nn.Module):
     return pos_emb
 
 
+@gin.configurable
 class GPT(nn.Module):
   def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
     super().__init__()
@@ -106,6 +113,7 @@ class GPT(nn.Module):
     return x
 
 
+@gin.configurable
 class AutoregressiveModel(nn.Module):
   def __init__(self, net: nn.Module, ignore_index=-100):
     super().__init__()
@@ -121,6 +129,7 @@ class AutoregressiveModel(nn.Module):
     loss = F.cross_entropy(logits, targets, ignore_index=self.ignore_index)
     return loss
 
+  @gin.configurable
   def generate(self,
                prompt,
                seq_len,
