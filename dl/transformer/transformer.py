@@ -22,6 +22,7 @@ class SelfAttention(nn.Module):
     Args:
       x: [batch, seq, dim]
     """
+    device = x.device
     q = self.to_q(x)
     k = self.to_k(x)
     v = self.to_v(x)
@@ -29,7 +30,7 @@ class SelfAttention(nn.Module):
     dots = einsum('b i d, b j d -> b i j', q, k) * self.scaling_factor
     if self.causal:
       j = dots.shape[-1]
-      mask = torch.ones((j, j), dtype=bool).triu(diagonal=1)
+      mask = torch.ones((j, j), dtype=bool, device=device).triu(diagonal=1)
       dots.masked_fill_(mask, float('-inf'))
     attention = F.softmax(dots, dim=-1)  # b i j
     summed = einsum('b i j, b j d -> b i d', attention, v)
@@ -88,9 +89,9 @@ class AbsolutePositionalEmbedding(nn.Module):
     self.scale = dim ** -0.5
 
   def forward(self, x):  # [b, s]  ->  [b, s, e]
-    seq_len = x.shape[1]
+    seq_len, device = x.shape[1], x.device
     assert seq_len <= self.max_seq_len, "input length > max_seq_len"
-    pos = torch.arange(seq_len)
+    pos = torch.arange(seq_len, device=device)
     pos_emb = self.emb(pos) * self.scale
     return pos_emb
 
