@@ -1,12 +1,12 @@
-exp_name = 'gpt-8l-768d-128msl'
+exp_name = 'small-model'
 
 batch_size = 32
 max_seq_len = 128
 learning_rate = 1e-5
-train_steps = 100_000
+train_steps = 100
 
 AutoregressiveModel.net = @GPT()
-GPT.n_layers = 8
-GPT.dim = 768
+GPT.n_layers = 4
+GPT.dim = 512
 GPT.max_seq_len = %max_seq_len
 GPT.vocab = 50257

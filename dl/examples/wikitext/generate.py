@@ -1,4 +1,5 @@
 """Generates text based on a prompt."""
+import argparse
 
 import gin
 import torch
@@ -6,8 +7,13 @@ import transformers as hf_transformers
 
 from dl.transformer import transformer
 
-config_path = 'dl/examples/wikitext/configs/gpt-8l-768d-128msl.gin'
-gin.parse_config_file(config_path)
+parser = argparse.ArgumentParser()
+parser.add_argument('--gin_config',
+                    default='gpt-8l-768d-128msl.gin',
+                    help='Path to the config.gin, relative to configs/')
+args = parser.parse_args()
+
+gin.parse_config_file(f'dl/examples/wikitext/configs/{args.gin_config}')
 
 model_path = (
   '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext/'

@@ -1,5 +1,6 @@
 """Trains transformer on wikitext."""
 
+import argparse
 import os
 
 import datasets as hf_datasets
@@ -16,7 +17,14 @@ def cycle(loader):
         for data in loader:
             yield data
 
-gin.parse_config_file('dl/examples/wikitext/configs/gpt-8l-768d-128msl.gin')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--gin_config',
+                    default='gpt-8l-768d-128msl.gin',
+                    help='Path to the config.gin, relative to configs/')
+args = parser.parse_args()
+
+gin.parse_config_file(f'dl/examples/wikitext/configs/{args.gin_config}')
 
 ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
 ds = ds.with_format('torch', device='cuda')
