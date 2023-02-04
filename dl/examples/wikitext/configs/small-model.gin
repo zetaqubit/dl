@@ -10,3 +10,5 @@ GPT.n_layers = 4
 GPT.dim = 512
 GPT.max_seq_len = %max_seq_len
 GPT.vocab = 50257
+
+SelfAttention.heads = 4

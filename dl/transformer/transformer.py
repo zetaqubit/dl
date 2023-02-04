@@ -9,9 +9,10 @@ from torch import nn, einsum
 
 @gin.configurable
 class SelfAttention(nn.Module):
-  def __init__(self, dim, causal=False):
+  def __init__(self, dim, heads, causal=False):
     super().__init__()
     self.scaling_factor = dim ** -0.5
+    self.heads = heads
     self.causal = causal
     self.to_q = nn.Linear(dim, dim)
     self.to_k = nn.Linear(dim, dim)
@@ -26,15 +27,19 @@ class SelfAttention(nn.Module):
     q = self.to_q(x)
     k = self.to_k(x)
     v = self.to_v(x)
+    q = rearrange(q, 'b s (h d) -> b h s d', h=self.heads)
+    k = rearrange(k, 'b s (h d) -> b h s d', h=self.heads)
+    v = rearrange(v, 'b s (h d) -> b h s d', h=self.heads)
 
-    dots = einsum('b i d, b j d -> b i j', q, k) * self.scaling_factor
+    dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scaling_factor
     if self.causal:
       j = dots.shape[-1]
       mask = torch.ones((j, j), dtype=bool, device=device).triu(diagonal=1)
       dots.masked_fill_(mask, float('-inf'))
-    attention = F.softmax(dots, dim=-1)  # b i j
-    summed = einsum('b i j, b j d -> b i d', attention, v)
-    return summed
+    attention = F.softmax(dots, dim=-1)  # b h i j
+    summed = einsum('b h i j, b h j d -> b h i d', attention, v)
+    concated = rearrange(summed, 'b h i d -> b i (h d)')
+    return concated
 
 
 @gin.configurable
