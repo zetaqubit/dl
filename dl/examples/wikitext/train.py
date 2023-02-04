@@ -1,7 +1,10 @@
 """Trains transformer on wikitext."""
 
+import os
+
 import datasets as hf_datasets
 import gin
+import pandas as pd
 import transformers as hf_transformers
 import torch
 import tqdm
@@ -13,7 +16,7 @@ def cycle(loader):
         for data in loader:
             yield data
 
-gin.parse_config_file('dl/examples/wikitext/config.gin')
+gin.parse_config_file('dl/examples/wikitext/configs/gpt-8l-768d-128msl.gin')
 
 ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
 ds = ds.with_format('torch', device='cuda')
@@ -36,7 +39,7 @@ optim = torch.optim.Adam(model.parameters(),
                          lr=gin.query_parameter('%learning_rate'))
 
 train_steps = gin.query_parameter('%train_steps')
-pbar = tqdm.tqdm(range(train_steps), mininterval=10., desc='training')
+pbar = tqdm.tqdm(range(train_steps), desc='training')
 for i in pbar:
   text = next(dl_train)['text']
   tokenized = tokenizer(
@@ -51,3 +54,21 @@ for i in pbar:
 
   if i % 10 == 0:
     pbar.set_description(f'train loss: {loss.item():.2f}')
+
+
+model_dir = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
+exp_name = gin.query_parameter('%exp_name')
+exp_dir = os.path.join(model_dir, exp_name)
+os.makedirs(exp_dir, exist_ok=True)
+
+# Write vocab.
+with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
+  vocab = {v: k for k, v in tokenizer.get_vocab().items()}
+  vocab = dict(sorted(vocab.items(), key=lambda item: item[0]))
+  df = pd.DataFrame.from_dict(vocab, orient='index')
+  df.to_csv(fd, index=False)
+
+# Write model
+model_path = os.path.join(exp_dir, 'model.pt')
+torch.save(model.state_dict(), model_path)
+print(f'Saved model to {model_path}')

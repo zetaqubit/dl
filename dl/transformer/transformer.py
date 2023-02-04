@@ -135,6 +135,7 @@ class AutoregressiveModel(nn.Module):
                prompt,
                seq_len,
                temperature=1,
+               eos_token=50257,
                ):  # [batch, seq] -> [batch, seq_len]
     was_training = self.net.training
     self.net.eval()
@@ -148,6 +149,8 @@ class AutoregressiveModel(nn.Module):
       sample = torch.multinomial(probs, 1)
       out = torch.cat((out, sample), dim=-1)
       # todo: handle eos and break
+      if (sample == eos_token).all():
+        break
 
     out = out[:, t:]
     self.net.train(was_training)
