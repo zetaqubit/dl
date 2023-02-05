@@ -8,6 +8,7 @@ import gin
 import pandas as pd
 import transformers as hf_transformers
 import torch
+from torch.utils import tensorboard as tb
 import tqdm
 
 from dl.transformer import transformer
@@ -26,7 +27,15 @@ args = parser.parse_args()
 
 gin.parse_config_file(f'dl/examples/wikitext/configs/{args.gin_config}')
 
+model_dir = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
+exp_dir = os.path.join(model_dir, gin.query_parameter('%exp_name'))
+os.makedirs(exp_dir, exist_ok=True)
+
 ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
+def filter_example(example):
+  text = example['text']
+  return len(text) > 64 and not text.startswith(' =')
+ds = ds.filter(filter_example)
 ds = ds.with_format('torch', device='cuda')
 ds_train, ds_valid = ds['train'], ds['validation']
 
@@ -46,10 +55,14 @@ model.cuda()
 optim = torch.optim.Adam(model.parameters(),
                          lr=gin.query_parameter('%learning_rate'))
 
+writer = tb.SummaryWriter(f'{exp_dir}/runs')
+writer.add_text('gin_config', gin.markdown(gin.operative_config_str()), 0)
+
 train_steps = gin.query_parameter('%train_steps')
+log_steps = gin.query_parameter('%log_steps')
 pbar = tqdm.tqdm(range(train_steps), desc='training')
 for i in pbar:
-  text = next(dl_train)['text']
+  text = next(dl_train)['text']  # [b, s]
   tokenized = tokenizer(
     text, padding='max_length', truncation=True,
     max_length=gin.query_parameter('%max_seq_len'),
@@ -60,14 +73,11 @@ for i in pbar:
   optim.step()
   optim.zero_grad()
 
-  if i % 10 == 0:
+  if i % log_steps == 0:
     pbar.set_description(f'train loss: {loss.item():.2f}')
-
-
-model_dir = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
-exp_name = gin.query_parameter('%exp_name')
-exp_dir = os.path.join(model_dir, exp_name)
-os.makedirs(exp_dir, exist_ok=True)
+    writer.add_scalar('loss/train', loss.item(), i)
+    writer.add_text('train/ex', text[0], i)
+    writer.flush()
 
 # Write vocab.
 with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
@@ -76,7 +86,13 @@ with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
   df = pd.DataFrame.from_dict(vocab, orient='index')
   df.to_csv(fd, index=False)
 
-# Write model
+# Write model.
 model_path = os.path.join(exp_dir, 'model.pt')
 torch.save(model.state_dict(), model_path)
 print(f'Saved model to {model_path}')
+
+# Write config.gin
+with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
+  fd.write(gin.operative_config_str())
+
+writer.close()
