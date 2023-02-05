@@ -18,6 +18,32 @@ def cycle(loader):
         for data in loader:
             yield data
 
+@torch.no_grad()
+def estimate_loss(model, data_loader, steps):
+  model.eval()
+  losses = torch.zeros(steps)
+  for i, batch in zip(range(steps), data_loader):
+    text, ids = batch['text'], batch['ids']
+    losses[i] = model(ids.to('cuda')).item()
+  model.train()
+  return losses.mean()
+
+def filter_example(example):
+  text = example['text']
+  return len(text) > 64 and not text.startswith(' =')
+
+tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
+tokenizer.pad_token = tokenizer.eos_token
+
+@gin.configurable
+def tokenize(example, max_seq_len):
+  text = example['text']
+  tokenized = tokenizer(
+    text, padding='max_length', truncation=True,
+    max_length=max_seq_len,
+    return_tensors='pt')
+  example['ids'] = tokenized['input_ids'][0]
+  return example
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--gin_config',
@@ -31,25 +57,21 @@ model_dir = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 exp_dir = os.path.join(model_dir, gin.query_parameter('%exp_name'))
 os.makedirs(exp_dir, exist_ok=True)
 
-ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
-def filter_example(example):
-  text = example['text']
-  return len(text) > 64 and not text.startswith(' =')
+ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1',
+                              streaming=True)
 ds = ds.filter(filter_example)
-ds = ds.with_format('torch', device='cuda')
+ds = ds.map(tokenize)
+ds = ds.with_format('torch')
 ds_train, ds_valid = ds['train'], ds['validation']
 
 batch_size = gin.query_parameter('%batch_size')
 dl_train = torch.utils.data.DataLoader(
-  dataset=ds_train, batch_size=batch_size, shuffle=True)
+  dataset=ds_train, batch_size=batch_size) #, shuffle=True)
 dl_valid = torch.utils.data.DataLoader(
-  dataset=ds_valid, batch_size=batch_size, shuffle=False)
-dl_train, dl_valid = cycle(dl_train), cycle(dl_valid)
+  dataset=ds_valid, batch_size=batch_size) #, shuffle=False)
+iter_train, iter_valid = cycle(dl_train), cycle(dl_valid)
 
-# TODO: dataset uses <unk>. Check that tokenizer is compatible.
-tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
-tokenizer.pad_token = tokenizer.eos_token
-model = transformer.AutoregressiveModel()
+model = transformer.AutoregressiveModel(tokenizer=tokenizer)
 model.cuda()
 
 optim = torch.optim.Adam(model.parameters(),
@@ -60,24 +82,37 @@ writer.add_text('gin_config', gin.markdown(gin.operative_config_str()), 0)
 
 train_steps = gin.query_parameter('%train_steps')
 log_steps = gin.query_parameter('%log_steps')
+eval_interval = gin.query_parameter('%eval_interval')
+eval_steps = gin.query_parameter('%eval_steps')
 pbar = tqdm.tqdm(range(train_steps), desc='training')
 for i in pbar:
-  text = next(dl_train)['text']  # [b, s]
-  tokenized = tokenizer(
-    text, padding='max_length', truncation=True,
-    max_length=gin.query_parameter('%max_seq_len'),
-    return_tensors='pt')
-  ids = tokenized['input_ids'].to('cuda')
-  loss = model(ids)
+  ex = next(iter_train)
+  text, ids = ex['text'], ex['ids']  # [b, s]
+  loss = model(ids.to('cuda'))
   loss.backward()
   optim.step()
   optim.zero_grad()
 
+  if i % eval_interval == 0:
+    loss_train = estimate_loss(model, dl_train, eval_steps)
+    loss_valid = estimate_loss(model, dl_valid, eval_steps)
+    writer.add_scalar('eval/loss_train', loss_train, i)
+    writer.add_scalar('eval/loss_valid', loss_valid, i)
+
+    # Example text and generation.
+    writer.add_text('example/ground_truth', text[0], i)
+    words = text[0].split(' ')
+    prompt, gt = ' '.join(words[:8]), ' '.join(words[8:])
+    generated = model.generate(prompt, 128)
+    log_ex = f'{prompt} | {generated}'
+    writer.add_text('example/generated', log_ex, i)
+
   if i % log_steps == 0:
-    pbar.set_description(f'train loss: {loss.item():.2f}')
     writer.add_scalar('loss/train', loss.item(), i)
-    writer.add_text('train/ex', text[0], i)
     writer.flush()
+
+  if i % 10 == 0:
+    pbar.set_description(f'train loss: {loss.item():.2f}')
 
 # Write vocab.
 with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
