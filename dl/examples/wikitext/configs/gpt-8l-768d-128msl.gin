@@ -10,10 +10,12 @@ eval_steps = 10
 
 tokenize.max_seq_len = %max_seq_len
 
-AutoregressiveModel.net = @GPT()
 GPT.n_layers = 8
 GPT.dim = 768
 GPT.max_seq_len = %max_seq_len
 GPT.vocab = 50257
+
+AutoregressiveModel.net = @GPT()
+AutoregressiveModel.ignore_index = 50256
 
 SelfAttention.heads = 4

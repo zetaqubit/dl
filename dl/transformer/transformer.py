@@ -10,7 +10,7 @@ from torch import nn, einsum
 
 @gin.configurable
 class SelfAttention(nn.Module):
-  def __init__(self, dim, heads, causal=False):
+  def __init__(self, dim: int, heads: int, causal=False):
     super().__init__()
     self.scaling_factor = dim ** -0.5
     self.heads = heads
@@ -48,7 +48,7 @@ class TransformerBlock(nn.Module):
   def __init__(self, dim: int, causal: bool):
     super().__init__()
     self.ln_1 = nn.LayerNorm(dim)
-    self.attention = SelfAttention(dim, causal)
+    self.attention = SelfAttention(dim=dim, causal=causal)
     self.ln_2 = nn.LayerNorm(dim)
     self.ff = nn.Linear(dim, dim)
 
@@ -131,7 +131,7 @@ class AutoregressiveModel(nn.Module):
   """
   def __init__(self, net: nn.Module,
                tokenizer: AutoTokenizer,
-               ignore_index=-100):
+               ignore_index: int):
     super().__init__()
     self.net = net
     self.tokenizer = tokenizer
@@ -167,7 +167,6 @@ class AutoregressiveModel(nn.Module):
     for _ in range(seq_len):
       x = out[:, -self.max_seq_len:]  # [b, msl]
       logits = self.net(x)[:, -1]  # [b, v]
-      print(logits)
       probs = F.softmax(logits / temperature, dim=-1)
       sample = torch.multinomial(probs, 1)  # [b, 1]
       out = torch.cat((out, sample), dim=-1)  # [b, s]

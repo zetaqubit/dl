@@ -2,7 +2,7 @@ exp_name = 'small-model'
 
 batch_size = 32
 max_seq_len = 128
-learning_rate = 1e-5
+learning_rate = 1e-4
 train_steps = 100
 log_steps = 10
 eval_interval = 10
@@ -10,10 +10,12 @@ eval_steps = 5
 
 tokenize.max_seq_len = %max_seq_len
 
-AutoregressiveModel.net = @GPT()
 GPT.n_layers = 4
 GPT.dim = 512
 GPT.max_seq_len = %max_seq_len
 GPT.vocab = 50257
 
-SelfAttention.heads = 4
+AutoregressiveModel.net = @GPT()
+AutoregressiveModel.ignore_index = 50256
+
+SelfAttention.heads = 2
