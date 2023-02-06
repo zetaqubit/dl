@@ -107,6 +107,7 @@ class GPT(nn.Module):
   def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
     super().__init__()
     self.max_seq_len = max_seq_len
+    self.vocab = vocab
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
     self.wpe = AbsolutePositionalEmbedding(dim, max_seq_len)
     self.transformers = Decoder(n_layers, dim)

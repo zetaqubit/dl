@@ -21,12 +21,12 @@ model_path = (
 )
 
 def load_model(path):
-  model = transformer.AutoregressiveModel()
+  tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
+  tokenizer.pad_token = tokenizer.eos_token
+  model = transformer.AutoregressiveModel(tokenizer=tokenizer)
   model.load_state_dict(torch.load(path))
   model.eval()
   model.cuda()
-  tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
-  tokenizer.pad_token = tokenizer.eos_token
   return model, tokenizer
 
 model, tokenizer = load_model(model_path)
@@ -37,8 +37,6 @@ while True:
   except (EOFError, KeyboardInterrupt):
     print()
     break
-  ids = tokenizer(prompt, return_tensors='pt')['input_ids'].to('cuda')
-  out_ids = model.generate(ids, seq_len=128)
-  out_text = tokenizer.decode(out_ids[0, ...])
+  out_text = model.generate(prompt, seq_len=gin.query_parameter('%max_seq_len'))
   print(out_text)
 

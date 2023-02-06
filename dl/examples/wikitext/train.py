@@ -9,6 +9,7 @@ import pandas as pd
 import transformers as hf_transformers
 import torch
 from torch.utils import tensorboard as tb
+import torchinfo
 import tqdm
 
 from dl.transformer import transformer
@@ -35,16 +36,6 @@ def filter_example(example):
 tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
 tokenizer.pad_token = tokenizer.eos_token
 
-@gin.configurable
-def tokenize(example, max_seq_len):
-  text = example['text']
-  tokenized = tokenizer(
-    text, padding='max_length', truncation=True,
-    max_length=max_seq_len,
-    return_tensors='pt')
-  example['ids'] = tokenized['input_ids'][0]
-  return example
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--gin_config',
                     default='gpt-8l-768d-128msl.gin',
@@ -56,6 +47,18 @@ gin.parse_config_file(f'dl/examples/wikitext/configs/{args.gin_config}')
 model_dir = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 exp_dir = os.path.join(model_dir, gin.query_parameter('%exp_name'))
 os.makedirs(exp_dir, exist_ok=True)
+
+max_seq_len = gin.query_parameter('%max_seq_len')
+
+def tokenize(example):
+  text = example['text']
+  tokenized = tokenizer(
+    text, padding='max_length', truncation=True,
+    max_length=max_seq_len,
+    return_tensors='pt')
+  example['ids'] = tokenized['input_ids'][0]
+  return example
+
 
 ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1',
                               streaming=True)
@@ -78,7 +81,11 @@ optim = torch.optim.Adam(model.parameters(),
                          lr=gin.query_parameter('%learning_rate'))
 
 writer = tb.SummaryWriter(f'{exp_dir}/runs')
-writer.add_text('gin_config', gin.markdown(gin.operative_config_str()), 0)
+writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
+model_summary = torchinfo.summary(
+  model, input_data=next(iter(dl_train))['ids'].to('cuda'))
+model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
+writer.add_text('model/summary', model_summary)
 
 train_steps = gin.query_parameter('%train_steps')
 log_steps = gin.query_parameter('%log_steps')
@@ -100,11 +107,16 @@ for i in pbar:
     writer.add_scalar('eval/loss_valid', loss_valid, i)
 
     # Example text and generation.
-    writer.add_text('example/ground_truth', text[0], i)
-    words = text[0].split(' ')
+    form = '''
+    | prompt       | {} |
+    | ground truth | {} |
+    | generated    | {} |
+    '''
+    text = text[0].rstrip(' \n')
+    words = text.split(' ')
     prompt, gt = ' '.join(words[:8]), ' '.join(words[8:])
     generated = model.generate(prompt, 128)
-    log_ex = f'{prompt} | {generated}'
+    log_ex = form.format(prompt, gt, generated)
     writer.add_text('example/generated', log_ex, i)
 
   if i % log_steps == 0:
