@@ -82,11 +82,17 @@ def train(_):
     dataset=ds_valid, batch_size=batch_size) #, shuffle=False)
   iter_train, iter_valid = cycle(dl_train), cycle(dl_valid)
 
+  train_steps = gin.query_parameter('%train_steps')
+  log_steps = gin.query_parameter('%log_steps')
+  eval_interval = gin.query_parameter('%eval_interval')
+  eval_steps = gin.query_parameter('%eval_steps')
+
   model = transformer.AutoregressiveModel(tokenizer=tokenizer)
   model.cuda()
-
   optim = torch.optim.Adam(model.parameters(),
                           lr=gin.query_parameter('%learning_rate'))
+  lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+      optim, T_max=train_steps, eta_min=1e-6)
 
   writer = tb.SummaryWriter(f'{exp_dir}/runs')
   writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
@@ -95,10 +101,6 @@ def train(_):
   model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
   writer.add_text('model/summary', model_summary)
 
-  train_steps = gin.query_parameter('%train_steps')
-  log_steps = gin.query_parameter('%log_steps')
-  eval_interval = gin.query_parameter('%eval_interval')
-  eval_steps = gin.query_parameter('%eval_steps')
   pbar = tqdm.tqdm(range(train_steps), desc='training')
   for i in pbar:
     ex = next(iter_train)
@@ -107,6 +109,7 @@ def train(_):
     loss.backward()
     optim.step()
     optim.zero_grad()
+    lr_scheduler.step()
 
     if i % eval_interval == 0:
       loss_train = estimate_loss(model, dl_train, eval_steps)
@@ -129,6 +132,7 @@ def train(_):
 
     if i % log_steps == 0:
       writer.add_scalar('loss/train', loss.item(), i)
+      writer.add_scalar('learning_rate', lr_scheduler.get_last_lr()[0], i)
       writer.flush()
 
     if i % 10 == 0:
