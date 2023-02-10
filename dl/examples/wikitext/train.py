@@ -15,11 +15,13 @@ import tqdm
 
 from dl.transformer import transformer
 
+flags.DEFINE_string('exp_name', None, 'Experiment name.')
+flags.DEFINE_string('model_name', None, 'Name of the model - one of configs/.')
 flags.DEFINE_multi_string(
-    'gin_config', ['gpt-12l-768d-128msl.gin'],
-  'List of config files, relative to configs/.')
+    'ginc', [],
+    'List of config files, relative to configs/.')
 flags.DEFINE_multi_string(
-    'gin_param', None,
+    'ginp', [],
     'Newline separated list of Gin parameter bindings.')
 
 FLAGS = flags.FLAGS
@@ -45,18 +47,25 @@ def filter_example(example):
   return len(text) > 64 and not text.startswith(' =')
 
 
+MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
+
+
 def train(_):
-  configs = [f'dl/examples/wikitext/configs/{f}' for f in FLAGS.gin_config]
-  gin.parse_config_files_and_bindings(configs, FLAGS.gin_param)
+  configs = [f'dl/examples/wikitext/configs/{f}'
+             for f in [FLAGS.model_name] + FLAGS.ginc]
+  configs = [f'{f}.gin' if not f.endswith('.gin') else f for f in configs]
+  gin_params = FLAGS.ginp + [ f'exp_name = \'{FLAGS.exp_name}\'' ]
+  print(configs, gin_params)
+  gin.parse_config_files_and_bindings(configs, gin_params)
 
-  tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
-  tokenizer.pad_token = tokenizer.eos_token
-
-  model_dir = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
-  exp_dir = os.path.join(model_dir, gin.query_parameter('%exp_name'))
+  model_name = gin.query_parameter('%model_name')
+  exp_dir = os.path.join(MODEL_DIR, model_name, FLAGS.exp_name)
   os.makedirs(exp_dir, exist_ok=True)
 
   max_seq_len = gin.query_parameter('%max_seq_len')
+
+  tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
+  tokenizer.pad_token = tokenizer.eos_token
 
   def tokenize(example):
     text = example['text']
@@ -159,3 +168,4 @@ def train(_):
 
 if __name__ == '__main__':
   app.run(train)
+  flags.mark_flags_as_required(['model_name', 'exp_name'])

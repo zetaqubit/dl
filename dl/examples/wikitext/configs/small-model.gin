@@ -1,4 +1,4 @@
-exp_name = 'small-model'
+model_name = 'small-model'
 
 batch_size = 32
 max_seq_len = 128

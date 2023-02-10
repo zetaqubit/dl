@@ -1,4 +1,4 @@
-exp_name = 'gpt-12l-768d-128msl'
+model_name = 'gpt-12l-768d-128msl'
 
 batch_size = 32
 max_seq_len = 128

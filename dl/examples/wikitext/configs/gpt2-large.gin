@@ -1,4 +1,4 @@
-exp_name = 'gpt2-large'
+model_name = 'gpt2-large'
 
 batch_size = 8
 max_seq_len = 256
