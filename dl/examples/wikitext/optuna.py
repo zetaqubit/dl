@@ -1,4 +1,6 @@
-"""Command-line for training a transformer on wikitext."""
+"""Tunes hyperparams using Optuna."""
+
+import os
 
 from absl import flags
 from absl import app
@@ -18,16 +20,14 @@ flags.DEFINE_multi_string(
 FLAGS = flags.FLAGS
 
 
-def train(_):
-  configs = [f'dl/examples/wikitext/configs/{f}'
-             for f in [FLAGS.model_name] + FLAGS.ginc]
-  configs = [f'{f}.gin' if not f.endswith('.gin') else f for f in configs]
-  gin_params = FLAGS.ginp + [ f'exp_name = \'{FLAGS.exp_name}\'' ]
-  print(configs, gin_params)
-  gin.parse_config_files_and_bindings(configs, gin_params)
-  train_lib.train()
+def prepare_gin_for_study():
+  gin.clear_config(clear_constants=True)
+
+
+def tune(_):
+  ...
 
 
 if __name__ == '__main__':
-  app.run(train)
+  app.run(tune)
   flags.mark_flags_as_required(['model_name', 'exp_name'])
