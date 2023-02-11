@@ -15,6 +15,7 @@ flags.DEFINE_multi_string(
 flags.DEFINE_multi_string(
     'ginp', [],
     'Newline separated list of Gin parameter bindings.')
+flags.DEFINE_integer('n_trials', 10, 'Number of trials to run.')
 
 FLAGS = flags.FLAGS
 
@@ -34,7 +35,7 @@ def prepare_gin_for_study(gin_overrides, trial_number):
 
 
 def objective(trial):
-  lr = trial.suggest_float('learning_rate', 1e-5, 1e-4)
+  lr = trial.suggest_float('learning_rate', 1e-6, 1e-3)
   prepare_gin_for_study([
       f'learning_rate = {lr}',
   ], trial.number)
@@ -44,10 +45,19 @@ def objective(trial):
 
 
 def tune(_):
-  study = optuna.create_study(
-    study_name=f'{FLAGS.model_name}/{FLAGS.exp_name}',
-    direction='minimize', storage=OPTUNA_DB)
-  study.optimize(objective, n_trials=4)
+  study_name=f'{FLAGS.model_name}/{FLAGS.exp_name}'
+  try:
+    study = optuna.create_study(
+      study_name=study_name, storage=OPTUNA_DB,
+      direction='minimize')
+  except optuna.exceptions.DuplicatedStudyError:
+    yes_or_no = input(f'Study {study_name} already exists. Resume it [y/N]? ')
+    if yes_or_no == 'y':
+      study = optuna.load_study(study_name=study_name, storage=OPTUNA_DB)
+    else:
+      return
+
+  study.optimize(objective, n_trials=FLAGS.n_trials)
 
 
 if __name__ == '__main__':

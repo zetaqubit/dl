@@ -95,7 +95,7 @@ def train():
   model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
   writer.add_text('model/summary', model_summary)
 
-  pbar = tqdm.tqdm(range(train_steps), desc='training')
+  pbar = tqdm.tqdm(range(train_steps + 1), desc='training')
   for i in pbar:
     ex = next(iter_train)
     text, ids = ex['text'], ex['ids']  # [b, s]
