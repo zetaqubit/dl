@@ -38,6 +38,7 @@ def filter_example(example):
   return len(text) > 64 and not text.startswith(' =')
 
 
+
 MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 
@@ -85,8 +86,13 @@ def train():
   model.cuda()
   optim = torch.optim.Adam(model.parameters(),
                           lr=gin.query_parameter('%learning_rate'))
-  lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-      optim, T_max=train_steps, eta_min=1e-6)
+  min_lr = 1e-6
+  terminating_lr = 1.01e-6  # once LR reaches this point, stop the training.
+  # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+  #     optim, T_max=train_steps, eta_min=min_lr)
+  lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optim, mode='min', factor=0.3, patience=300, cooldown=100,
+    min_lr=min_lr)
 
   writer = tb.SummaryWriter(exp_dir)
   writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
@@ -103,9 +109,21 @@ def train():
     loss.backward()
     optim.step()
     optim.zero_grad()
-    lr_scheduler.step()
+    lr_scheduler.step(loss.item())
 
-    if i % eval_interval == 0:
+    stop_training = False
+    if i % log_steps == 0:
+      writer.add_scalar('step', i, i)
+      writer.add_scalar('loss/train', loss.item(), i)
+      lr = optim.param_groups[0]['lr']
+      writer.add_scalar('learning_rate', lr, i)
+      writer.flush()
+      if lr <= terminating_lr:
+        stop_training = True
+        print(f'Training terminating early at step {i}, '
+              f'lr = {lr}, loss = {loss.item()}')
+
+    if stop_training or (i % eval_interval == 0):
       loss_train = estimate_loss(model, dl_train, eval_steps)
       loss_valid = estimate_loss(model, dl_valid, eval_steps)
       writer.add_scalar('eval/loss_train', loss_train, i)
@@ -124,13 +142,11 @@ def train():
       log_ex = form.format(prompt, gt, generated)
       writer.add_text('example/generated', log_ex, i)
 
-    if i % log_steps == 0:
-      writer.add_scalar('loss/train', loss.item(), i)
-      writer.add_scalar('learning_rate', lr_scheduler.get_last_lr()[0], i)
-      writer.flush()
 
     if i % 10 == 0:
       pbar.set_description(f'train loss: {loss.item():.2f}')
+
+    if stop_training: break
 
   # Write vocab.
   with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
@@ -155,4 +171,5 @@ def train():
     'loss/train': loss.item(),
     'eval/loss_train': loss_train,
     'eval/loss_valid': loss_valid,
+    'step': i,
   }

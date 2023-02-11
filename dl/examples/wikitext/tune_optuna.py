@@ -1,9 +1,12 @@
 """Tunes hyperparams using Optuna."""
 
+import os
+
 from absl import flags
 from absl import app
 import gin
 import optuna
+import tensorflow as tf
 
 from dl.examples.wikitext import train_lib
 
@@ -20,6 +23,7 @@ flags.DEFINE_integer('n_trials', 10, 'Number of trials to run.')
 FLAGS = flags.FLAGS
 
 OPTUNA_DB = 'sqlite:////media/14tb/ml/models/zetaqubit/dl/optuna/optuna.db'
+MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 def prepare_gin_for_study(gin_overrides, trial_number):
   configs = [f'dl/examples/wikitext/configs/{f}'
@@ -35,12 +39,20 @@ def prepare_gin_for_study(gin_overrides, trial_number):
 
 
 def objective(trial):
-  lr = trial.suggest_float('learning_rate', 1e-6, 1e-3)
+  lr = trial.suggest_float('learning_rate', 5e-6, 1e-3)
   prepare_gin_for_study([
       f'learning_rate = {lr}',
   ], trial.number)
 
   metrics = train_lib.train()
+
+  dir = os.path.join(MODEL_DIR, FLAGS.model_name, FLAGS.exp_name,
+                     str(trial.number))
+  with tf.summary.create_file_writer(dir).as_default():
+    step = metrics['step']
+    for k, v in metrics.items():
+      tf.summary.scalar(k, v, step=step)
+
   return metrics['eval/loss_valid']
 
 
@@ -57,7 +69,10 @@ def tune(_):
     else:
       return
 
-  study.optimize(objective, n_trials=FLAGS.n_trials)
+  tb_callback = optuna.integration.TensorBoardCallback(
+    dirname=f'{MODEL_DIR}/{study_name}', metric_name='eval/loss_valid'
+  )
+  study.optimize(objective, n_trials=FLAGS.n_trials, callbacks=[tb_callback])
 
 
 if __name__ == '__main__':

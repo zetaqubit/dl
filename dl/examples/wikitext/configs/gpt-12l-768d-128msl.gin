@@ -3,8 +3,8 @@ model_name = 'gpt-12l-768d-128msl'
 batch_size = 32
 max_seq_len = 128
 learning_rate = 1e-4
-train_steps = 100_000
-log_steps = 500
+train_steps = 10_000
+log_steps = 100
 eval_interval = 1000
 eval_steps = 10
 
