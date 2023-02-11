@@ -88,7 +88,7 @@ def train():
   lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
       optim, T_max=train_steps, eta_min=1e-6)
 
-  writer = tb.SummaryWriter(f'{exp_dir}/runs')
+  writer = tb.SummaryWriter(exp_dir)
   writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
   model_summary = torchinfo.summary(
     model, input_data=next(iter(dl_train))['ids'].to('cuda'))
@@ -149,3 +149,10 @@ def train():
     fd.write(gin.operative_config_str())
 
   writer.close()
+
+  # Return final metrics
+  return {
+    'loss/train': loss.item(),
+    'eval/loss_train': loss_train,
+    'eval/loss_valid': loss_valid,
+  }
