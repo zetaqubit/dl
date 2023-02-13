@@ -4,6 +4,7 @@ No FLAGS to allow it to be imported (e.g. by optuna).
 All configuration has happened a priori via gin.
 """
 
+import math
 import os
 
 import datasets as hf_datasets
@@ -86,13 +87,23 @@ def train():
   model.cuda()
   optim = torch.optim.Adam(model.parameters(),
                           lr=gin.query_parameter('%learning_rate'))
-  min_lr = 1e-6
-  terminating_lr = 1.01e-6  # once LR reaches this point, stop the training.
-  # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-  #     optim, T_max=train_steps, eta_min=min_lr)
-  lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optim, mode='min', factor=0.3, patience=300, cooldown=100,
-    min_lr=min_lr)
+
+  def get_lr_scheduler(optimizer, total_steps, warmup_steps):
+      def lr_lambda(step):
+          if step < warmup_steps:
+              return float(step) / float(max(1, warmup_steps))
+          return 0.5 * (1.0 + math.cos(math.pi * float(step - warmup_steps) / float(max(1, total_steps - warmup_steps))))
+
+      return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+  lr_scheduler = get_lr_scheduler(
+      optim, total_steps=train_steps, warmup_steps=1500)
+
+  # min_lr = 1e-7
+  # terminating_lr = 1.01e-6  # once LR reaches this point, stop the training.
+  # lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+  #   optim, mode='min', factor=0.3, patience=300, cooldown=100,
+  #   min_lr=min_lr)
 
   writer = tb.SummaryWriter(exp_dir)
   writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
@@ -109,7 +120,7 @@ def train():
     loss.backward()
     optim.step()
     optim.zero_grad()
-    lr_scheduler.step(loss.item())
+    lr_scheduler.step()
 
     stop_training = False
     if i % log_steps == 0:
@@ -118,10 +129,10 @@ def train():
       lr = optim.param_groups[0]['lr']
       writer.add_scalar('learning_rate', lr, i)
       writer.flush()
-      if lr <= terminating_lr:
-        stop_training = True
-        print(f'Training terminating early at step {i}, '
-              f'lr = {lr}, loss = {loss.item()}')
+      # if lr <= terminating_lr:
+      #   stop_training = True
+      #   print(f'Training terminating early at step {i}, '
+      #         f'lr = {lr}, loss = {loss.item()}')
 
     if stop_training or (i % eval_interval == 0):
       loss_train = estimate_loss(model, dl_train, eval_steps)
