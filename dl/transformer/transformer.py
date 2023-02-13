@@ -47,10 +47,15 @@ class SelfAttention(nn.Module):
 class TransformerBlock(nn.Module):
   def __init__(self, dim: int, causal: bool):
     super().__init__()
+    dim_internal = dim * 4
     self.ln_1 = nn.LayerNorm(dim)
     self.attention = SelfAttention(dim=dim, causal=causal)
     self.ln_2 = nn.LayerNorm(dim)
-    self.ff = nn.Linear(dim, dim)
+    self.ff = nn.Sequential(
+      nn.Linear(dim, dim_internal),
+      nn.GELU(),
+      nn.Linear(dim_internal, dim)
+    )
 
   def forward(self, x):
     x = x + self.attention(self.ln_1(x))
