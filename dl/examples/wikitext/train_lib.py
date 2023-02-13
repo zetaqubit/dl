@@ -137,7 +137,7 @@ def train():
       '''
       text = text[0].rstrip(' \n')
       words = text.split(' ')
-      prompt, gt = ' '.join(words[:8]), ' '.join(words[8:])
+      prompt, gt = ' '.join(words[:32]), ' '.join(words[32:])
       generated = model.generate(prompt, 128)
       log_ex = form.format(prompt, gt, generated)
       writer.add_text('example/generated', log_ex, i)
