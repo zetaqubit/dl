@@ -85,8 +85,11 @@ def train():
 
   model = transformer.AutoregressiveModel(tokenizer=tokenizer)
   model.cuda()
-  optim = torch.optim.Adam(model.parameters(),
-                          lr=gin.query_parameter('%learning_rate'))
+  # optim = torch.optim.Adam(model.parameters(),
+  #                         lr=gin.query_parameter('%learning_rate'))
+  optim = torch.optim.RMSprop(model.parameters(),
+                              lr=gin.query_parameter('%learning_rate'),
+                              alpha=0.9)
 
   def get_lr_scheduler(optimizer, total_steps, warmup_steps):
       def lr_lambda(step):

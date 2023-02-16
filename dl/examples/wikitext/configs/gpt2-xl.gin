@@ -1,6 +1,6 @@
 model_name = 'gpt2-xl'
 
-batch_size = 8
+batch_size = 4
 max_seq_len = 128
 learning_rate = 5e-5
 train_steps = 50_000
