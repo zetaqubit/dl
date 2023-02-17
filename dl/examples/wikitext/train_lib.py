@@ -6,6 +6,7 @@ All configuration has happened a priori via gin.
 
 import math
 import os
+import signal
 
 import datasets as hf_datasets
 import gin
@@ -117,6 +118,14 @@ def train():
   model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
   writer.add_text('model/summary', model_summary)
 
+  # Cleanup after training
+  def post_training(signum, frame):
+    # Symlink final model.
+    checkpoint.save_ckpt(exp_dir, model, optim)
+    writer.close()
+    if signum: exit(1)
+  signal.signal(signal.SIGINT, post_training)
+
   pbar = tqdm.tqdm(range(train_steps + 1), desc='training')
   for i in pbar:
     ex = next(iter_train)
@@ -158,8 +167,7 @@ def train():
       log_ex = form.format(prompt, gt, generated)
       writer.add_text('example/generated', log_ex, i)
 
-
-    if i % 10 == 0:
+    if stop_training or (i % 10 == 0):
       pbar.set_description(f'train loss: {loss.item():.2f}')
 
     if stop_training or (i % ckpt_steps == 0):
@@ -174,17 +182,11 @@ def train():
     df = pd.DataFrame.from_dict(vocab, orient='index')
     df.to_csv(fd, index=False)
 
-  # Symlink final model.
-  checkpoint.save_ckpt(exp_dir, model, optim)
-  # model_path = os.path.join(exp_dir, 'model.pt')
-  # torch.save(model.state_dict(), model_path)
-  # print(f'Saved model to {model_path}')
-
   # Write config.gin
   with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
     fd.write(gin.operative_config_str())
 
-  writer.close()
+  post_training(None, None)
 
   # Return final metrics
   return {
