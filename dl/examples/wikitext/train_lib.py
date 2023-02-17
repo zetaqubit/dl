@@ -16,6 +16,7 @@ from torch.utils import tensorboard as tb
 import torchinfo
 import tqdm
 
+from dl.examples.wikitext import checkpoint
 from dl.transformer import transformer
 
 
@@ -82,6 +83,7 @@ def train():
   log_steps = gin.query_parameter('%log_steps')
   eval_interval = gin.query_parameter('%eval_interval')
   eval_steps = gin.query_parameter('%eval_steps')
+  ckpt_steps = gin.query_parameter('%ckpt_steps')
 
   model = transformer.AutoregressiveModel(tokenizer=tokenizer)
   model.cuda()
@@ -125,8 +127,8 @@ def train():
     optim.zero_grad()
     lr_scheduler.step()
 
-    stop_training = False
-    if i % log_steps == 0:
+    stop_training = (i == train_steps)
+    if stop_training or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
       writer.add_scalar('loss/train', loss.item(), i)
       lr = optim.param_groups[0]['lr']
@@ -160,6 +162,9 @@ def train():
     if i % 10 == 0:
       pbar.set_description(f'train loss: {loss.item():.2f}')
 
+    if stop_training or (i % ckpt_steps == 0):
+      checkpoint.save_ckpt(exp_dir, model, optim, step=i)
+
     if stop_training: break
 
   # Write vocab.
@@ -169,10 +174,11 @@ def train():
     df = pd.DataFrame.from_dict(vocab, orient='index')
     df.to_csv(fd, index=False)
 
-  # Write model.
-  model_path = os.path.join(exp_dir, 'model.pt')
-  torch.save(model.state_dict(), model_path)
-  print(f'Saved model to {model_path}')
+  # Symlink final model.
+  checkpoint.save_ckpt(exp_dir, model, optim)
+  # model_path = os.path.join(exp_dir, 'model.pt')
+  # torch.save(model.state_dict(), model_path)
+  # print(f'Saved model to {model_path}')
 
   # Write config.gin
   with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
