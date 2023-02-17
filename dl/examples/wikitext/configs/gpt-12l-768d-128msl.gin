@@ -7,6 +7,7 @@ train_steps = 100_000
 log_steps = 100
 eval_interval = 1000
 eval_steps = 5
+ckpt_steps = 20_000
 
 GPT.n_layers = 12
 GPT.dim = 768

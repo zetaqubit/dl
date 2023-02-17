@@ -3,10 +3,11 @@ model_name = 'gpt2-xl'
 batch_size = 4
 max_seq_len = 128
 learning_rate = 5e-5
-train_steps = 50_000
+train_steps = 100_000
 log_steps = 500
 eval_interval = 1000
 eval_steps = 1
+ckpt_steps = 10_000
 
 GPT.n_layers = 48
 GPT.dim = 1600
