@@ -6,6 +6,7 @@ All configuration has happened a priori via gin.
 
 import math
 import os
+import shutil
 import signal
 
 import datasets as hf_datasets
@@ -40,18 +41,28 @@ def filter_example(example):
   text = example['text']
   return len(text) > 64 and not text.startswith(' =')
 
+def gin_get(param, default=None):
+  try:
+    return gin.query_parameter(param)
+  except ValueError as e:
+    if default: return default
+    raise
 
 
 MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 
 def train():
-  model_name = gin.query_parameter('%model_name')
-  exp_name = gin.query_parameter('%exp_name')
+  model_name = gin_get('%model_name')
+  exp_name = gin_get('%exp_name')
   exp_dir = os.path.join(MODEL_DIR, model_name, exp_name)
+  resume = gin_get('%resume')
+
+  if not resume:
+    shutil.rmtree(exp_dir, ignore_errors=True)
   os.makedirs(exp_dir, exist_ok=True)
 
-  max_seq_len = gin.query_parameter('%max_seq_len')
+  max_seq_len = gin_get('%max_seq_len')
 
   tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
   tokenizer.pad_token = tokenizer.eos_token
@@ -73,26 +84,27 @@ def train():
   ds = ds.with_format('torch')
   ds_train, ds_valid = ds['train'], ds['validation']
 
-  batch_size = gin.query_parameter('%batch_size')
+  batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
     dataset=ds_train, batch_size=batch_size) #, shuffle=True)
   dl_valid = torch.utils.data.DataLoader(
     dataset=ds_valid, batch_size=batch_size) #, shuffle=False)
   iter_train, iter_valid = cycle(dl_train), cycle(dl_valid)
 
-  train_steps = gin.query_parameter('%train_steps')
-  log_steps = gin.query_parameter('%log_steps')
-  eval_interval = gin.query_parameter('%eval_interval')
-  eval_steps = gin.query_parameter('%eval_steps')
-  ckpt_steps = gin.query_parameter('%ckpt_steps')
+  train_steps = gin_get('%train_steps')
+  log_steps = gin_get('%log_steps')
+  eval_interval = gin_get('%eval_interval')
+  eval_steps = gin_get('%eval_steps')
+  ckpt_steps = gin_get('%ckpt_steps')
 
   model = transformer.AutoregressiveModel(tokenizer=tokenizer)
   model.cuda()
-  # optim = torch.optim.Adam(model.parameters(),
-  #                         lr=gin.query_parameter('%learning_rate'))
-  optim = torch.optim.RMSprop(model.parameters(),
-                              lr=gin.query_parameter('%learning_rate'),
-                              alpha=0.9)
+  optim = torch.optim.Adam(model.parameters(),
+                          lr=gin_get('%learning_rate'))
+  # optim = torch.optim.RMSprop(model.parameters(),
+  #                             lr=gin_get('%learning_rate'),
+  #                             alpha=0.9)
+
 
   def get_lr_scheduler(optimizer, total_steps, warmup_steps):
       def lr_lambda(step):
@@ -126,7 +138,15 @@ def train():
     if signum: exit(1)
   signal.signal(signal.SIGINT, post_training)
 
-  pbar = tqdm.tqdm(range(train_steps + 1), desc='training')
+  start_step = 0
+  end_step = train_steps
+  if resume:
+    state = checkpoint.load_ckpt(exp_dir, model,
+                                 optim if resume == 'model_opt' else None)
+    start_step = state['step']
+    end_step += start_step
+
+  pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training')
   for i in pbar:
     ex = next(iter_train)
     text, ids = ex['text'], ex['ids']  # [b, s]
@@ -136,7 +156,7 @@ def train():
     optim.zero_grad()
     lr_scheduler.step()
 
-    stop_training = (i == train_steps)
+    stop_training = (i == end_step)
     if stop_training or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
       writer.add_scalar('loss/train', loss.item(), i)

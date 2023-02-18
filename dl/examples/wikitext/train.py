@@ -14,6 +14,12 @@ flags.DEFINE_multi_string(
 flags.DEFINE_multi_string(
     'ginp', [],
     'Newline separated list of Gin parameter bindings.')
+flags.DEFINE_string(
+    'resume', '',
+    'Whether to resume training from a found checkpoint. Options are: \n'
+    '  "": delete the directory and retrain from scratch (default)\n'
+    '  "model": resume with model params from last checkpoint\n'
+    '  "model_opt": resume with model param and optimizer.')
 
 FLAGS = flags.FLAGS
 
@@ -24,6 +30,7 @@ def train(_):
   configs = [f'{f}.gin' if not f.endswith('.gin') else f for f in configs]
   gin_params = FLAGS.ginp + [
       f'exp_name = "{FLAGS.exp_name}"',
+      f'resume = "{FLAGS.resume}"',
   ]
   print(configs, gin_params)
   gin.parse_config_files_and_bindings(configs, gin_params)
