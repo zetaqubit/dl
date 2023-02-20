@@ -173,6 +173,7 @@ def train():
       loss_valid = estimate_loss(model, dl_valid, eval_steps)
       writer.add_scalar('eval/loss_train', loss_train, i)
       writer.add_scalar('eval/loss_valid', loss_valid, i)
+      writer.add_scalar('eval/perplexity_valid', loss_valid.exp(), i)
 
       # Example text and generation.
       form = '''
