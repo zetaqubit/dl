@@ -11,6 +11,7 @@ import signal
 
 import datasets as hf_datasets
 import gin
+import numpy as np
 import pandas as pd
 import transformers as hf_transformers
 import torch
@@ -174,6 +175,7 @@ def train():
       writer.add_scalar('eval/loss_train', loss_train, i)
       writer.add_scalar('eval/loss_valid', loss_valid, i)
       writer.add_scalar('eval/perplexity_valid', loss_valid.exp(), i)
+      writer.add_scalar('eval/bits_per_token_valid', loss_valid / np.log(2), i)
 
       # Example text and generation.
       form = '''
