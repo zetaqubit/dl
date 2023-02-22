@@ -5,7 +5,7 @@ import tempfile
 
 import torch
 
-def save_ckpt(dir, model, optimizer, step=None):
+def save_ckpt(dir, model, optimizer, step=None, **kwargs):
   if step is None:
     path = f'{dir}/model.pt'
     ckpts = find_ckpts(dir)
@@ -16,11 +16,13 @@ def save_ckpt(dir, model, optimizer, step=None):
     return
 
   path = f'{dir}/model-{step}.pt'
-  torch.save({
+  state = {
       'step': step,
       'model': model.state_dict(),
       'optimizer': optimizer.state_dict(),
-  }, path)
+  }
+  state.update(kwargs)
+  torch.save(state, path)
   print(f'Saved model to {path}')
 
 

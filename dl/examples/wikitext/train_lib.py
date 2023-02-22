@@ -139,12 +139,16 @@ def train():
     if signum: exit(1)
   signal.signal(signal.SIGINT, post_training)
 
+  tokens_seen = 0
+  tokens_total = 0
   start_step = 0
   end_step = train_steps
   if resume:
     state = checkpoint.load_ckpt(exp_dir, model,
                                  optim if resume == 'model_opt' else None)
     start_step = state['step']
+    tokens_seen = state.get('tokens_seen', 0)
+    tokens_total = state.get('tokens_total', 0)
     end_step += start_step
 
   pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training')
@@ -157,12 +161,17 @@ def train():
     optim.zero_grad()
     lr_scheduler.step()
 
+    tokens_seen += (ids.detach() != model.ignore_index).sum().item()
+    tokens_total += ids.shape[0] * ids.shape[1]
+
     stop_training = (i == end_step)
     if stop_training or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
       writer.add_scalar('loss/train', loss.item(), i)
       lr = optim.param_groups[0]['lr']
       writer.add_scalar('learning_rate', lr, i)
+      writer.add_scalar('step/tokens_seen', tokens_seen, i)
+      writer.add_scalar('step/tokens_used_rate', tokens_seen / tokens_total, i)
       writer.flush()
       # if lr <= terminating_lr:
       #   stop_training = True
@@ -194,7 +203,9 @@ def train():
       pbar.set_description(f'train loss: {loss.item():.2f}')
 
     if stop_training or (i % ckpt_steps == 0):
-      checkpoint.save_ckpt(exp_dir, model, optim, step=i)
+      checkpoint.save_ckpt(exp_dir, model, optim, step=i,
+                           tokens_seen=tokens_seen,
+                           tokens_total=tokens_total)
 
     if stop_training: break
 
