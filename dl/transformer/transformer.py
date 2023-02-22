@@ -119,11 +119,26 @@ class GPT(nn.Module):
     self.lm_head = nn.Linear(dim, vocab, bias=False)
     self.lm_head.weight = self.wte.weight  # tie embedding weight
 
+    # Initialize weights.
+    self.apply(self.init_weights_)
+    # apply special scaled init to the residual projections, per GPT-2 paper
+    for pn, p in self.named_parameters():
+      if pn.endswith('c_proj.weight'):
+        torch.nn.init.normal_(p, mean=0.0, std=0.02/torch.sqrt(2 * n_layers))
+
   def forward(self, ids):
     x = self.wte(ids) + self.wpe(ids)
     x = self.transformers(x)
     x = self.lm_head(x)
     return x
+
+  def init_weights_(self, module):
+    if isinstance(module, nn.Linear):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        if module.bias is not None:
+            torch.nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.Embedding):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
 
 @gin.configurable
