@@ -24,9 +24,10 @@ from dl.transformer import transformer
 
 
 def cycle(loader):
-    while True:
-        for data in loader:
-            yield data
+  while True:
+    for data in loader:
+      yield data
+
 
 @torch.no_grad()
 def estimate_loss(model, data_loader, steps):
@@ -90,7 +91,7 @@ def train():
     dataset=ds_train, batch_size=batch_size) #, shuffle=True)
   dl_valid = torch.utils.data.DataLoader(
     dataset=ds_valid, batch_size=batch_size) #, shuffle=False)
-  iter_train, iter_valid = cycle(dl_train), cycle(dl_valid)
+  iter_train = cycle(dl_train)
 
   train_steps = gin_get('%train_steps')
   log_steps = gin_get('%log_steps')
