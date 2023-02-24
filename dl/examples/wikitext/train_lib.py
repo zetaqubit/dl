@@ -62,6 +62,7 @@ def text_completion_sxs(model, texts, num=2):
   words = text.split(' ')
   prompt, gt = ' '.join(words[:16]), ' '.join(words[16:])
   generated = model.generate(prompt, 128)
+  generated = generated.strip('\n')
   log_ex = form.format(prompt, gt, generated)
   return log_ex
 
