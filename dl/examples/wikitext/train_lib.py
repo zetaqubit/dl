@@ -50,6 +50,22 @@ def gin_get(param, default=None):
     if default: return default
     raise
 
+def text_completion_sxs(model, texts, num=2):
+  # Example text and generation.
+  form = '''
+    | prompt       | {} |
+    | ground truth | {} |
+    | generated    | {} |
+  '''
+  text = texts[0]
+  text = text.rstrip(' \n')
+  words = text.split(' ')
+  prompt, gt = ' '.join(words[:16]), ' '.join(words[16:])
+  generated = model.generate(prompt, 128)
+  log_ex = form.format(prompt, gt, generated)
+  return log_ex
+
+
 
 MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
@@ -187,18 +203,11 @@ def train():
       writer.add_scalar('eval/perplexity_valid', loss_valid.exp(), i)
       writer.add_scalar('eval/bits_per_token_valid', loss_valid / np.log(2), i)
 
-      # Example text and generation.
-      form = '''
-      | prompt       | {} |
-      | ground truth | {} |
-      | generated    | {} |
-      '''
-      text = text[0].rstrip(' \n')
-      words = text.split(' ')
-      prompt, gt = ' '.join(words[:32]), ' '.join(words[32:])
-      generated = model.generate(prompt, 128)
-      log_ex = form.format(prompt, gt, generated)
-      writer.add_text('example/generated', log_ex, i)
+      log_ex = text_completion_sxs(model, text)
+      writer.add_text('example/train', log_ex, i)
+
+      log_ex = text_completion_sxs(model, next(iter(dl_valid))['text'])
+      writer.add_text('example/eval', log_ex, i)
 
     if stop_training or (i % 10 == 0):
       pbar.set_description(f'train loss: {loss.item():.2f}')
