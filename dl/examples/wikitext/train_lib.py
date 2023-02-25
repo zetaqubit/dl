@@ -190,6 +190,7 @@ def train():
       writer.add_scalar('learning_rate', lr, i)
       writer.add_scalar('step/tokens_seen', tokens_seen, i)
       writer.add_scalar('step/tokens_used_rate', tokens_seen / tokens_total, i)
+      writer.add_scalar('over_tokens/loss_train', loss.item(), tokens_seen)
       writer.flush()
       # if lr <= terminating_lr:
       #   stop_training = True
@@ -203,6 +204,9 @@ def train():
       writer.add_scalar('eval/loss_valid', loss_valid, i)
       writer.add_scalar('eval/perplexity_valid', loss_valid.exp(), i)
       writer.add_scalar('eval/bits_per_token_valid', loss_valid / np.log(2), i)
+
+      writer.add_scalar('over_tokens/loss_eval_train', loss_train, tokens_seen)
+      writer.add_scalar('over_tokens/loss_eval_valid', loss_valid, tokens_seen)
 
       log_ex = text_completion_sxs(model, text)
       writer.add_text('example/train', log_ex, i)
