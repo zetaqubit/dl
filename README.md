@@ -3,6 +3,16 @@ Implementations of different Deep Learning architectures and algorithms, using o
 
 # TODOs
 
+## transformer
+
+- [x] Implement transformer with self-attention
+- [ ] Add support for cross-attention, as used in NMT
+
+## rnn
+
+- [ ] Implement RNN
+- [ ] Implement LSTM
+
 ## examples/wikitext
 
 - [x] Load wikitext dataset
@@ -14,3 +24,4 @@ Implementations of different Deep Learning architectures and algorithms, using o
 - [x] Limit train set to 1 batch and verify train loss goes to 0
 - [ ] Try mixed precision
 - [ ] Scale to 1.5B param model
+- [ ] Scale to 1024 sequence length
