@@ -22,8 +22,8 @@ def save_ckpt(dir, model, optimizer, step=None, **kwargs):
       'optimizer': optimizer.state_dict(),
   }
   state.update(kwargs)
+  print(f'Saving model to {path}')
   torch.save(state, path)
-  print(f'Saved model to {path}')
 
 
 def load_ckpt(dir, model, optimizer=None, step=None):
