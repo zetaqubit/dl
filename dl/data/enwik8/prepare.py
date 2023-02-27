@@ -12,13 +12,13 @@ from datasets import load_dataset # huggingface datasets
 # good number to use is ~order number of cpu cores // 2
 num_proc = 8
 
-# takes 54GB in huggingface .cache dir, about 8M documents (8,013,769)
-dataset = load_dataset("openwebtext")
+# takes 100MB in huggingface .cache dir, about 1M documents (1,128,024)
+dataset = load_dataset("enwik8")
 
-DATASET_DIR = '/home/z/data/zetaqubit/dl/data/openwebtext/'
+DATASET_DIR = '/home/z/data/zetaqubit/dl/data/enwik8/'
 
 # owt by default only contains the 'train' split, so create a test split
-split_dataset = dataset["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+split_dataset = dataset["train"].train_test_split(test_size=0.05, seed=2357, shuffle=True)
 split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
 
 # this results in:
@@ -26,11 +26,11 @@ split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
 # DatasetDict({
 #     train: Dataset({
 #         features: ['text'],
-#         num_rows: 8009762
+#         num_rows: 1071622
 #     })
 #     val: Dataset({
 #         features: ['text'],
-#         num_rows: 4007
+#         num_rows: 56402
 #     })
 # })
 
