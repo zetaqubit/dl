@@ -50,6 +50,7 @@ def gin_get(param, default=None):
     if default: return default
     raise
 
+@torch.no_grad()
 def text_completion_sxs(model, texts, num=2):
   # Example text and generation.
   form = '''
@@ -123,6 +124,8 @@ def train():
   # optim = torch.optim.RMSprop(model.parameters(),
   #                             lr=gin_get('%learning_rate'),
   #                             alpha=0.9)
+  # optim = torch.optim.SGD(model.parameters(), lr=gin_get('%learning_rate'),
+  #                         momentum=0.9)
 
 
   def get_lr_scheduler(optimizer, total_steps, warmup_steps):
@@ -169,18 +172,25 @@ def train():
     tokens_total = state.get('tokens_total', 0)
     end_step += start_step
 
-  pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training')
+  accum_grad_steps = gin_get('%accum_grad_steps', 1)
+
+  pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training',
+                   mininterval=0.5)
   for i in pbar:
-    ex = next(iter_train)
-    text, ids = ex['text'], ex['ids']  # [b, s]
-    loss = model(ids.to('cuda'))
-    loss.backward()
+    for _ in range(accum_grad_steps):
+      ex = next(iter_train)
+      text, ids = ex['text'], ex['ids']  # [b, s]
+      loss = model(ids.to('cuda'))
+      (loss / accum_grad_steps).backward()
+      tokens_seen += (ids.detach() != model.ignore_index).sum().item()
+      tokens_total += ids.shape[0] * ids.shape[1]
+
     optim.step()
     optim.zero_grad()
     lr_scheduler.step()
 
-    tokens_seen += (ids.detach() != model.ignore_index).sum().item()
-    tokens_total += ids.shape[0] * ids.shape[1]
+    pbar.set_description(f'train loss: {loss.item():.2f}')
+
 
     stop_training = (i == end_step)
     if stop_training or (i % log_steps == 0):
@@ -214,8 +224,6 @@ def train():
       log_ex = text_completion_sxs(model, next(iter(dl_valid))['text'])
       writer.add_text('example/eval', log_ex, i)
 
-    if stop_training or (i % 10 == 0):
-      pbar.set_description(f'train loss: {loss.item():.2f}')
 
     if stop_training or (i % ckpt_steps == 0):
       checkpoint.save_ckpt(exp_dir, model, optim, step=i,
