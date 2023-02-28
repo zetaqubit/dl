@@ -19,6 +19,7 @@ from torch.utils import tensorboard as tb
 import torchinfo
 import tqdm
 
+from dl.data import dataset
 from dl.examples.wikitext import checkpoint
 from dl.transformer import transformer
 
@@ -33,8 +34,7 @@ def cycle(loader):
 def estimate_loss(model, data_loader, steps):
   model.eval()
   losses = torch.zeros(steps)
-  for i, batch in zip(range(steps), data_loader):
-    text, ids = batch['text'], batch['ids']
+  for i, ids in zip(range(steps), data_loader):
     losses[i] = model(ids.to('cuda')).item()
   model.train()
   return losses.mean()
@@ -73,6 +73,8 @@ MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 
 def train():
+  torch.manual_seed(42)
+
   model_name = gin_get('%model_name')
   exp_name = gin_get('%exp_name')
   exp_dir = os.path.join(MODEL_DIR, model_name, exp_name)
@@ -97,12 +99,16 @@ def train():
     return example
 
 
-  ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1',
-                                streaming=True)
-  ds = ds.filter(filter_example)
-  ds = ds.map(tokenize)
-  ds = ds.with_format('torch')
-  ds_train, ds_valid = ds['train'], ds['validation']
+  # ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1',
+  #                               streaming=True)
+  # ds = ds.filter(filter_example)
+  # ds = ds.map(tokenize)
+  # ds = ds.with_format('torch')
+  # ds_train, ds_valid = ds['train'], ds['validation']
+
+  ds_name = 'enwik8'
+  ds_train = dataset.MemoryMappedDataset(ds_name, 'train', max_seq_len+1)
+  ds_valid = dataset.MemoryMappedDataset(ds_name, 'val', max_seq_len+1)
 
   batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
@@ -110,6 +116,9 @@ def train():
   dl_valid = torch.utils.data.DataLoader(
     dataset=ds_valid, batch_size=batch_size) #, shuffle=False)
   iter_train = cycle(dl_train)
+
+  ids_valid = next(iter(dl_valid))
+  text_valid = tokenizer.batch_decode(ids_valid)
 
   train_steps = gin_get('%train_steps')
   log_steps = gin_get('%log_steps')
@@ -147,10 +156,20 @@ def train():
 
   writer = tb.SummaryWriter(exp_dir)
   writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
-  model_summary = torchinfo.summary(
-    model, input_data=next(iter(dl_train))['ids'].to('cuda'))
+  model_summary = torchinfo.summary(model, input_data=ids_valid)
   model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
   writer.add_text('model/summary', model_summary)
+
+  # Write vocab.
+  with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
+    vocab = {v: k for k, v in tokenizer.get_vocab().items()}
+    vocab = dict(sorted(vocab.items(), key=lambda item: item[0]))
+    df = pd.DataFrame.from_dict(vocab, orient='index')
+    df.to_csv(fd, index=False)
+
+  # Write config.gin
+  with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
+    fd.write(gin.operative_config_str())
 
   # Cleanup after training
   def post_training(signum, frame):
@@ -178,8 +197,9 @@ def train():
                    mininterval=0.5)
   for i in pbar:
     for _ in range(accum_grad_steps):
-      ex = next(iter_train)
-      text, ids = ex['text'], ex['ids']  # [b, s]
+      # ex = next(iter_train)
+      # text, ids = ex['text'], ex['ids']  # [b, s]
+      ids = next(iter_train)
       loss = model(ids.to('cuda'))
       (loss / accum_grad_steps).backward()
       tokens_seen += (ids.detach() != model.ignore_index).sum().item()
@@ -218,10 +238,11 @@ def train():
       writer.add_scalar('over_tokens/loss_eval_train', loss_train, tokens_seen)
       writer.add_scalar('over_tokens/loss_eval_valid', loss_valid, tokens_seen)
 
+      text = tokenizer.batch_decode(ids)
       log_ex = text_completion_sxs(model, text)
       writer.add_text('example/train', log_ex, i)
 
-      log_ex = text_completion_sxs(model, next(iter(dl_valid))['text'])
+      log_ex = text_completion_sxs(model, text_valid)
       writer.add_text('example/eval', log_ex, i)
 
 
@@ -231,17 +252,6 @@ def train():
                            tokens_total=tokens_total)
 
     if stop_training: break
-
-  # Write vocab.
-  with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
-    vocab = {v: k for k, v in tokenizer.get_vocab().items()}
-    vocab = dict(sorted(vocab.items(), key=lambda item: item[0]))
-    df = pd.DataFrame.from_dict(vocab, orient='index')
-    df.to_csv(fd, index=False)
-
-  # Write config.gin
-  with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
-    fd.write(gin.operative_config_str())
 
   post_training(None, None)
 
