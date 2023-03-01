@@ -106,7 +106,7 @@ def train():
   # ds = ds.with_format('torch')
   # ds_train, ds_valid = ds['train'], ds['validation']
 
-  ds_name = 'enwik8'
+  ds_name = 'openwebtext'
   ds_train = dataset.MemoryMappedDataset(ds_name, 'train', max_seq_len+1)
   ds_valid = dataset.MemoryMappedDataset(ds_name, 'val', max_seq_len+1)
 
