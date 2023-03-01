@@ -1,0 +1,5 @@
+RNNCell.hidden_size = 128
+RNNCell.activation_hh = @torch.tanh
+RNNCell.activation_hx = @torch.tanh
+
+RNN.n_layers = 4

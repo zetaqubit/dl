@@ -1,15 +1,10 @@
 from importlib import reload
 
+import gin.torch
 import numpy as np
 import torch
 
-def create_gpt(model='small-model'):
-  import gin
-  from dl.transformer import transformer
-  gin.parse_config_files_and_bindings(
-      [f'dl/examples/wikitext/configs/{model}.gin'], [])
-  gpt = transformer.GPT()
-  return gpt
+gin.enter_interactive_mode()
 
 
 def magic(cmd):
@@ -22,3 +17,21 @@ def autoreload():
 def save_history():
   magic('%history -f /tmp/ipython.py')
   print('Saved history to /tmp/ipython.py')
+
+def clear():
+  gin.clear_config(clear_constants=True)
+
+def create_gpt(model='small-model'):
+  from dl.transformer import transformer
+  clear()
+  gin.parse_config_files_and_bindings(
+      [f'dl/examples/wikitext/configs/{model}.gin'], [])
+  gpt = transformer.GPT()
+  return gpt
+
+def create_rnn(model='small-model'):
+  from dl.rnn import rnn
+  clear()
+  gin.parse_config_files_and_bindings([f'dl/rnn/configs/{model}.gin'], [])
+  m = rnn.RNN()
+  return m
