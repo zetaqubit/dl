@@ -9,7 +9,6 @@ import os
 import shutil
 import signal
 
-import datasets as hf_datasets
 import gin
 import numpy as np
 import pandas as pd
@@ -89,24 +88,7 @@ def train():
   tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
   tokenizer.pad_token = tokenizer.eos_token
 
-  def tokenize(example):
-    text = example['text']
-    tokenized = tokenizer(
-      text, padding='max_length', truncation=True,
-      max_length=max_seq_len,
-      return_tensors='pt')
-    example['ids'] = tokenized['input_ids'][0]
-    return example
-
-
-  # ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1',
-  #                               streaming=True)
-  # ds = ds.filter(filter_example)
-  # ds = ds.map(tokenize)
-  # ds = ds.with_format('torch')
-  # ds_train, ds_valid = ds['train'], ds['validation']
-
-  ds_name = 'openwebtext'
+  ds_name = gin_get('%dataset', 'openwebtext')
   ds_train = dataset.MemoryMappedDataset(ds_name, 'train', max_seq_len+1)
   ds_valid = dataset.MemoryMappedDataset(ds_name, 'val', max_seq_len+1)
 
