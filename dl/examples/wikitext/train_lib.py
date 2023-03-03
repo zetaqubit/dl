@@ -12,13 +12,13 @@ import signal
 import gin
 import numpy as np
 import pandas as pd
-import transformers as hf_transformers
 import torch
 from torch.utils import tensorboard as tb
 import torchinfo
 import tqdm
 
 from dl.data import dataset
+from dl.data import tokenizers
 from dl.examples.wikitext import checkpoint
 from dl.transformer import transformer
 
@@ -85,12 +85,15 @@ def train():
 
   max_seq_len = gin_get('%max_seq_len')
 
-  tokenizer = hf_transformers.AutoTokenizer.from_pretrained('gpt2')
-  tokenizer.pad_token = tokenizer.eos_token
+  tok_lib = gin_get('%tok_lib', 'huggingface')
+  tok_type = gin_get('%tok_type', 'gpt2')
+  tokenizer = tokenizers.create(tok_lib, tok_type)
 
   ds_name = gin_get('%dataset', 'openwebtext')
-  ds_train = dataset.MemoryMappedDataset(ds_name, 'train', max_seq_len+1)
-  ds_valid = dataset.MemoryMappedDataset(ds_name, 'val', max_seq_len+1)
+  ds_train = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.train',
+                                         max_seq_len+1)
+  ds_valid = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.val',
+                                         max_seq_len+1)
 
   batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
@@ -100,7 +103,7 @@ def train():
   iter_train = cycle(dl_train)
 
   ids_valid = next(iter(dl_valid))
-  text_valid = tokenizer.batch_decode(ids_valid)
+  text_valid = tokenizer.decode_batch(ids_valid)
 
   train_steps = gin_get('%train_steps')
   log_steps = gin_get('%log_steps')
@@ -143,11 +146,11 @@ def train():
   writer.add_text('model/summary', model_summary)
 
   # Write vocab.
-  with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
-    vocab = {v: k for k, v in tokenizer.get_vocab().items()}
-    vocab = dict(sorted(vocab.items(), key=lambda item: item[0]))
-    df = pd.DataFrame.from_dict(vocab, orient='index')
-    df.to_csv(fd, index=False)
+  # with open(os.path.join(exp_dir, 'vocab.txt'), 'w') as fd:
+  #   vocab = {v: k for k, v in tokenizer.get_vocab().items()}
+  #   vocab = dict(sorted(vocab.items(), key=lambda item: item[0]))
+  #   df = pd.DataFrame.from_dict(vocab, orient='index')
+  #   df.to_csv(fd, index=False)
 
   # Write config.gin
   with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
@@ -179,8 +182,6 @@ def train():
                    mininterval=0.5)
   for i in pbar:
     for _ in range(accum_grad_steps):
-      # ex = next(iter_train)
-      # text, ids = ex['text'], ex['ids']  # [b, s]
       ids = next(iter_train)
       loss = model(ids.to('cuda'))
       (loss / accum_grad_steps).backward()
@@ -220,7 +221,7 @@ def train():
       writer.add_scalar('over_tokens/loss_eval_train', loss_train, tokens_seen)
       writer.add_scalar('over_tokens/loss_eval_valid', loss_valid, tokens_seen)
 
-      text = tokenizer.batch_decode(ids)
+      text = tokenizer.decode_batch(ids)
       log_ex = text_completion_sxs(model, text)
       writer.add_text('example/train', log_ex, i)
 

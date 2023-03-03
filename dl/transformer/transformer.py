@@ -2,10 +2,11 @@
 
 import gin
 from einops import rearrange
-from transformers import AutoTokenizer
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
+
+from dl.data import tokenizers
 
 
 @gin.configurable
@@ -151,7 +152,7 @@ class AutoregressiveModel(nn.Module):
     - Generate text via a prompt.
   """
   def __init__(self, net: nn.Module,
-               tokenizer: AutoTokenizer,
+               tokenizer: tokenizers.Tokenizer,
                ignore_index: int):
     super().__init__()
     self.net = net
@@ -172,7 +173,6 @@ class AutoregressiveModel(nn.Module):
                prompt,
                seq_len,
                temperature=1,
-               eos_token=50257,
                ):  # [batch, seq] -> [batch, seq_len]
     """Text prompt -> text output."""
     was_training = self.net.training
@@ -182,7 +182,7 @@ class AutoregressiveModel(nn.Module):
     if isinstance(prompt, str):
       was_batched = False
       prompt = [prompt]
-    ids = torch.tensor(self.tokenizer(prompt).input_ids, device='cuda')
+    ids = torch.tensor(self.tokenizer.encode_batch(prompt), device='cuda')
     b, t = ids.shape
     out = ids
     for _ in range(seq_len):
@@ -191,13 +191,10 @@ class AutoregressiveModel(nn.Module):
       probs = F.softmax(logits / temperature, dim=-1)
       sample = torch.multinomial(probs, 1)  # [b, 1]
       out = torch.cat((out, sample), dim=-1)  # [b, s]
-      # todo: handle eos and break
-      if (sample == eos_token).all():
-        break
     self.net.train(was_training)
 
     out = out[:, t:]
-    out = self.tokenizer.batch_decode(out)
+    out = self.tokenizer.decode_batch(out)
     if not was_batched: out = out[0]
 
     return out
