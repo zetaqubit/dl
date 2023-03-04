@@ -21,6 +21,7 @@ from dl.data import dataset
 from dl.data import tokenizers
 from dl.examples.wikitext import checkpoint
 from dl.transformer import transformer
+from dl.utils.config_utils import gin_get
 
 
 def cycle(loader):
@@ -42,13 +43,6 @@ def filter_example(example):
   text = example['text']
   return len(text) > 64 and not text.startswith(' =')
 
-def gin_get(param, default=None):
-  try:
-    return gin.query_parameter(param)
-  except ValueError as e:
-    if default: return default
-    raise
-
 @torch.no_grad()
 def text_completion_sxs(model, texts, num=2):
   # Example text and generation.
@@ -65,7 +59,6 @@ def text_completion_sxs(model, texts, num=2):
   generated = generated.strip('\n')
   log_ex = form.format(prompt, gt, generated)
   return log_ex
-
 
 
 MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
@@ -140,7 +133,7 @@ def train():
   #   min_lr=min_lr)
 
   writer = tb.SummaryWriter(exp_dir)
-  writer.add_text('model/gin_config', gin.markdown(gin.operative_config_str()), 0)
+  writer.add_text('model/gin_config', gin.markdown(gin.config_str()), 0)
   model_summary = torchinfo.summary(model, input_data=ids_valid)
   model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
   writer.add_text('model/summary', model_summary)
@@ -154,7 +147,7 @@ def train():
 
   # Write config.gin
   with open(os.path.join(exp_dir, 'config.gin'), 'w') as fd:
-    fd.write(gin.operative_config_str())
+    fd.write(gin.config_str())
 
   # Cleanup after training
   def post_training(signum, frame):
