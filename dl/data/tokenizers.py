@@ -54,10 +54,10 @@ class TikTokenTokenizer(Tokenizer):
     self.tokenizer = tiktoken.get_encoding(tok_type)
 
   def encode_batch(self, texts, **kwargs):
-    return self.tokenizer.encode_batch(texts, **kwargs)
+    return self.tokenizer.encode_batch(texts, allowed_special='all', **kwargs)
 
   def decode_batch(self, ids, **kwargs):
-    return np.array([self.tokenizer.decode(seq, **kwargs) for seq in ids])
+    return np.array([self.tokenizer.decode(list(seq), **kwargs) for seq in ids])
 
   @property
   def padding_id(self) -> int:
