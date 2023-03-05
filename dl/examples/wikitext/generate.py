@@ -22,9 +22,8 @@ MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 
 def load_model(dir):
-  tok_lib = gin_get('%tok_lib', 'huggingface')
   tok_type = gin_get('%tok_type', 'gpt2')
-  tokenizer = tokenizers.create(tok_lib, tok_type)
+  tokenizer = tokenizers.create(tok_type)
   model = transformer.AutoregressiveModel(tokenizer=tokenizer)
   checkpoint.load_ckpt(dir, model)
   # model.load_state_dict(torch.load(path))

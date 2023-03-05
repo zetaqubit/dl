@@ -31,18 +31,17 @@ class Tokenizer(abc.ABC):
 
 
 @gin.configurable(module='tokenizers')
-def create(library: str, tok_type: str,
-           max_seq_len=None) -> Tokenizer:
+def create(tok_type: str, max_seq_len=None) -> Tokenizer:
   tok = None
-  if library == 'tiktoken':
-    tok = TikTokenTokenizer(tok_type)
-  elif library == 'huggingface':
-    tok = HuggingFaceTokenizer(tok_type)
-  elif tok_type == 'char':
+  if tok_type in ('char',):
     tok = CharTokenizer()
+  elif tok_type in ('gpt2',):
+    tok = TikTokenTokenizer(tok_type)
+  else:
+    tok = HuggingFaceTokenizer(tok_type)
 
   if not tok:
-    raise ValueError(f'Unknown tokenizer lib: {library} and type: {tok_type}.')
+    raise ValueError(f'Unknown tokenizer type: {tok_type}.')
 
   if max_seq_len:
     tok = PaddingTokenizer(tok, max_seq_len)
@@ -62,7 +61,7 @@ class TikTokenTokenizer(Tokenizer):
 
   @property
   def padding_id(self) -> int:
-    raise NotImplementedError
+    return self.tokenizer.eot_token
 
 
 class HuggingFaceTokenizer(Tokenizer):

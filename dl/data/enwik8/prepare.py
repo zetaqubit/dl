@@ -3,10 +3,30 @@
 # https://github.com/HazyResearch/flash-attention/blob/main/training/src/datamodules/language_modeling_hf.py
 
 import os
-from tqdm import tqdm
-import numpy as np
-import tiktoken
+import sys
+
+from absl import flags
 from datasets import load_dataset # huggingface datasets
+import numpy as np
+import gin
+import tiktoken
+from tqdm import tqdm
+
+from dl.data import tokenizers
+from dl.utils.config_utils import gin_get
+
+flags.DEFINE_multi_string(
+    'ginc', [],
+    'List of config files.')
+flags.DEFINE_multi_string(
+    'ginp', [],
+    'Newline separated list of Gin parameter bindings.')
+
+flags.FLAGS(sys.argv)
+FLAGS = flags.FLAGS
+
+
+gin.parse_config_files_and_bindings(FLAGS.ginc, FLAGS.ginp)
 
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
@@ -35,10 +55,12 @@ split_dataset['val'] = split_dataset.pop('test') # rename the test split to val
 # })
 
 # we now want to tokenize the dataset. first define the encoding function (gpt2 bpe)
-enc = tiktoken.get_encoding("gpt2")
+# enc = tiktoken.get_encoding("gpt2")
+tok_type = gin_get('%tok_type', 'gpt2')
+tokenizer = tokenizers.create(tok_type)
 def process(example):
-    ids = enc.encode_ordinary(example['text']) # encode_ordinary ignores any special tokens
-    ids.append(enc.eot_token) # add the end of text token, e.g. 50256 for gpt2 bpe
+    ids = tokenizer.encode(example['text']) # encode_ordinary ignores any special tokens
+    ids.append(tokenizer.padding_id) # add the end of text token, e.g. 50256 for gpt2 bpe
     # note: I think eot should be prepended not appended... hmm. it's called "eot" though...
     out = {'ids': ids, 'len': len(ids)}
     return out
@@ -49,6 +71,7 @@ tokenized = split_dataset.map(
     remove_columns=['text'],
     desc="tokenizing the splits",
     num_proc=num_proc,
+    load_from_cache_file=False,  # Caching not supported for some tokenizers.
 )
 
 os.makedirs(DATASET_DIR, exist_ok=True)
@@ -56,7 +79,7 @@ os.makedirs(DATASET_DIR, exist_ok=True)
 # concatenate all the ids in each dataset into one large file we can use for training
 for split, dset in tokenized.items():
     arr_len = np.sum(dset['len'])
-    filename = os.path.join(DATASET_DIR, f'{split}.bin')
+    filename = os.path.join(DATASET_DIR, f'{tok_type}.{split}.bin')
     dtype = np.uint16 # (can do since enc.max_token_value == 50256 is < 2**16)
     arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
 
@@ -73,3 +96,5 @@ for split, dset in tokenized.items():
 
 # to read the bin files later, e.g. with numpy:
 # m = np.memmap('train.bin', dtype=np.uint16, mode='r')
+
+

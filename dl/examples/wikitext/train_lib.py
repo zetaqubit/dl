@@ -78,9 +78,8 @@ def train():
 
   max_seq_len = gin_get('%max_seq_len')
 
-  tok_lib = gin_get('%tok_lib', 'huggingface')
   tok_type = gin_get('%tok_type', 'gpt2')
-  tokenizer = tokenizers.create(tok_lib, tok_type)
+  tokenizer = tokenizers.create(tok_type)
 
   ds_name = gin_get('%dataset', 'openwebtext')
   ds_train = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.train',
