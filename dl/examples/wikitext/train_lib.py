@@ -123,7 +123,7 @@ def train():
       return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
   lr_scheduler = get_lr_scheduler(
-      optim, total_steps=train_steps, warmup_steps=1500)
+      optim, total_steps=train_steps, warmup_steps=int(0.1 * train_steps))
 
   # min_lr = 1e-7
   # terminating_lr = 1.01e-6  # once LR reaches this point, stop the training.
