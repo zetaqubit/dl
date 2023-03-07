@@ -1,8 +1,12 @@
 """Implementations of various RNN architectures."""
 
 import gin.torch
+from einops import rearrange
 import torch
+import torch.nn.functional as F
 from torch import nn, einsum
+
+from dl.data import tokenizers
 
 gin.external_configurable(torch.sigmoid, module='torch')
 gin.external_configurable(torch.tanh, module='torch')
@@ -29,7 +33,6 @@ class RNNCell(nn.Module):
     return x_t, h_t
 
 
-@gin.configurable
 class RNN(nn.Module):
   def __init__(self, n_layers):
     super().__init__()
@@ -51,7 +54,116 @@ class RNN(nn.Module):
     assert n == self.n_layers
     assert hidden_size == x_hidden
 
-    hs_t = torch.empty_like(hs)
+    hs_outs = [None] * len(self.rnn_cells)
     for i, cell in enumerate(self.rnn_cells):
-      x, hs_t[:, i, :] = cell(x, hs[:, i, :])
-    return x, hs_t
+      x, hs_outs[i] = cell(x, hs[:, i, :])
+    return x, torch.stack(hs_outs, dim=1)
+
+
+@gin.configurable
+class RnnLM(nn.Module):
+  """Language model backed by a RNN."""
+  def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
+    super().__init__()
+    self.n_layers = n_layers
+    self.dim = dim
+    self.vocab = vocab
+    self.rnn = RNN(n_layers)
+    self.wte = nn.Embedding(vocab, dim)  # token embeddings
+    self.lm_head = nn.Linear(dim, vocab, bias=False)
+    self.lm_head.weight = self.wte.weight  # tie embedding weight
+
+    self.max_seq_len = max_seq_len
+
+    # Initialize weights.
+    self.apply(self.init_weights_)
+
+  def forward(self, ids):
+    """
+    input: ids [b, t]
+    output: logits [b, t, vocab]
+    """
+    b, seq_len = ids.shape
+    xs = self.wte(ids)  # [b, seq_len, dim]
+    hs = torch.zeros((b, self.n_layers, self.dim), device=ids.device)
+    logits_seq = [None] * seq_len
+    for t in range(seq_len):
+      x, hs = self.rnn(xs[:, t, :], hs)
+      logits = self.lm_head(x)
+      logits_seq[t] = logits
+    return torch.stack(logits_seq, axis=1)
+
+  def init_weights_(self, module):
+    if isinstance(module, nn.Linear):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.2)
+        if module.bias is not None:
+            torch.nn.init.zeros_(module.bias)
+    elif isinstance(module, nn.Embedding):
+        torch.nn.init.normal_(module.weight, mean=0.0, std=0.2)
+
+@gin.configurable
+class GenerativeRnnModel(nn.Module):
+  """Wrapper around a RNN model, providing additional capabilities.
+
+  Capabilities provided:
+    - Language modeling loss.
+    - Tokenization (text str <-> ids).
+    - Generate text via a prompt.
+  """
+  def __init__(self, net: nn.Module,
+               tokenizer: tokenizers.Tokenizer,
+               ignore_index: int):
+    super().__init__()
+    self.net = net
+    self.tokenizer = tokenizer
+    self.ignore_index = ignore_index
+    self.max_seq_len = net.max_seq_len
+
+  def forward(self, x):  # [batch, seq] -> loss
+    inputs, targets = x[:, :-1], x[:, 1:]
+    logits = self.net(inputs)
+    logits = rearrange(logits, 'b s v -> (b s) v')
+    targets = rearrange(targets, 'b s -> (b s)')
+    loss = F.cross_entropy(logits, targets, ignore_index=self.ignore_index)
+    return loss
+
+  @gin.configurable
+  def generate(self,
+               prompt,
+               seq_len,
+               temperature=1,
+               ):  # [batch, seq] -> [batch, seq_len]
+    """Text prompt -> text output."""
+    was_training = self.net.training
+    self.net.eval()
+
+    was_batched = True
+    if isinstance(prompt, str):
+      was_batched = False
+      prompt = [prompt]
+    ids = torch.tensor(self.tokenizer.encode_batch(prompt), device='cuda')
+    b, prompt_len = ids.shape
+
+    # Run RNN through the prompt.
+    xs = self.net.wte(ids)  # [b, prompt_len, dim]
+    hs = torch.zeros((b, self.net.n_layers, self.net.dim), device=ids.device)
+    for t in range(prompt_len - 1):
+      _, hs = self.net.rnn(xs[:, t, :], hs)
+
+    # Start generation.
+    out = ids
+    x = xs[:, -1, :]
+    for _ in range(seq_len):
+      y, hs = self.net.rnn(x, hs)
+      logits = self.net.lm_head(y)  # [b, v]
+      probs = F.softmax(logits / temperature, dim=-1)
+      sample = torch.multinomial(probs, 1)  # [b, 1]
+      out = torch.cat((out, sample), dim=-1)  # [b, s]
+      x = self.net.wte(sample)
+      x = rearrange(x, 'b 1 d -> b d')  # t = 1
+    self.net.train(was_training)
+
+    out = out[:, prompt_len:]
+    out = self.tokenizer.decode_batch(out)
+    if not was_batched: out = out[0]
+    return out
