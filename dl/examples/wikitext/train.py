@@ -25,8 +25,10 @@ FLAGS = flags.FLAGS
 
 
 def train(_):
-  configs = [f'dl/examples/wikitext/configs/{f}'
-             for f in [FLAGS.model_name] + FLAGS.ginc]
+  gin.add_config_file_search_path('./dl/examples/wikitext/configs/')
+  gin.add_config_file_search_path('./dl/rnn/configs/')
+
+  configs = FLAGS.ginc + [f'{FLAGS.model_name}']
   configs = [f'{f}.gin' if not f.endswith('.gin') else f for f in configs]
   gin_params = FLAGS.ginp + [
       f'exp_name = "{FLAGS.exp_name}"',
