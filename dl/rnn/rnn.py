@@ -78,19 +78,30 @@ class RnnLM(nn.Module):
     # Initialize weights.
     self.apply(self.init_weights_)
 
-  def forward(self, ids):
+  def forward(self, ids, teacher_force_mask=1):
     """
     input: ids [b, t]
     output: logits [b, t, vocab]
     """
     b, seq_len = ids.shape
+    if not hasattr(teacher_force_mask, '__len__') or len(teacher_force_mask) == 1:
+      teacher_force_mask = torch.full(
+        (seq_len,), teacher_force_mask, device=ids.device)
+    assert len(teacher_force_mask) == seq_len
     xs = self.wte(ids)  # [b, seq_len, dim]
     hs = torch.zeros((b, self.n_layers, self.dim), device=ids.device)
     logits_seq = [None] * seq_len
+    x = xs[:, 0, :]
     for t in range(seq_len):
-      x, hs = self.rnn(xs[:, t, :], hs)
+      x, hs = self.rnn(x, hs)
       logits = self.lm_head(x)
       logits_seq[t] = logits
+      if not teacher_force_mask[t]:
+        probs = F.softmax(logits, dim=-1)
+        id = torch.multinomial(probs, 1)  # [b, 1]
+        x = self.wte(id)  # [b, 1, dim]
+        x = rearrange(x, 'b 1 d -> b d')
+
     return torch.stack(logits_seq, axis=1)
 
   def init_weights_(self, module):
@@ -119,9 +130,21 @@ class GenerativeRnnModel(nn.Module):
     self.ignore_index = ignore_index
     self.max_seq_len = net.max_seq_len
 
-  def forward(self, x):  # [batch, seq] -> loss
+  def forward(self, x, teacher_forcing='all'):  # [batch, seq] -> loss
     inputs, targets = x[:, :-1], x[:, 1:]
-    logits = self.net(inputs)
+    b, t = inputs.shape
+
+    if teacher_forcing == 'all':
+      mask = 1
+    elif teacher_forcing == 'none':
+      mask = 0
+    elif teacher_forcing == 'first_half':
+      mask = torch.zeros(t, device=inputs.device)
+      mask[:t//2] = 1
+    else:
+      raise ValueError(f'Unknown teacher forcing opt: {teacher_forcing}')
+
+    logits = self.net(inputs, mask)
     logits = rearrange(logits, 'b s v -> (b s) v')
     targets = rearrange(targets, 'b s -> (b s)')
     loss = F.cross_entropy(logits, targets, ignore_index=self.ignore_index)

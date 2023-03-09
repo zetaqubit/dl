@@ -20,6 +20,7 @@ import tqdm
 from dl.data import dataset
 from dl.data import tokenizers
 from dl.examples.wikitext import checkpoint
+from dl.rnn import rnn
 from dl.transformer import transformer
 from dl.utils.config_utils import gin_get
 
@@ -31,11 +32,11 @@ def cycle(loader):
 
 
 @torch.no_grad()
-def estimate_loss(model, data_loader, steps):
+def estimate_loss(model, data_loader, steps, **kwargs):
   model.eval()
   losses = torch.zeros(steps)
   for i, ids in zip(range(steps), data_loader):
-    losses[i] = model(ids.to('cuda')).item()
+    losses[i] = model(ids.to('cuda'), **kwargs).item()
   model.train()
   return losses.mean()
 
@@ -86,6 +87,7 @@ def train():
                                          max_seq_len+1)
   ds_valid = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.val',
                                          max_seq_len+1)
+  print(f'Loaded dataset {ds_name}/{tok_type}.train')
 
   batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
@@ -212,6 +214,13 @@ def train():
 
       writer.add_scalar('over_tokens/loss_eval_train', loss_train, tokens_seen)
       writer.add_scalar('over_tokens/loss_eval_valid', loss_valid, tokens_seen)
+
+      if isinstance(model, rnn.GenerativeRnnModel):
+        teacher_forcing = ['all', 'first_half']
+        for mode in teacher_forcing:
+          loss_mode = estimate_loss(model, dl_train, eval_steps,
+                                    teacher_forcing=mode)
+          writer.add_scalar(f'eval/loss_train_force_{mode}', loss_mode, i)
 
       text = tokenizer.decode_batch(ids)
       log_ex = text_completion_sxs(model, text)
