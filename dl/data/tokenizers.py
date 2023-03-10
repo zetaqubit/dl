@@ -23,6 +23,10 @@ class Tokenizer(abc.ABC):
   def padding_id() -> int:
     pass
 
+  @abc.abstractproperty
+  def vocab_size() -> int:
+    pass
+
   def encode(self, text: str) -> List[int]:
     return self.encode_batch([text])[0]
 
@@ -63,6 +67,10 @@ class TikTokenTokenizer(Tokenizer):
   def padding_id(self) -> int:
     return self.tokenizer.eot_token
 
+  @property
+  def vocab_size(self) -> int:
+    return self.tokenizer.max_token_value + 1
+
 
 class HuggingFaceTokenizer(Tokenizer):
   def __init__(self, tok_type: str):
@@ -78,6 +86,10 @@ class HuggingFaceTokenizer(Tokenizer):
   @property
   def padding_id(self) -> int:
     return self.tokenizer.pad_token_id
+
+  @property
+  def vocab_size(self) -> int:
+    return len(self.tokenizer.get_vocab())
 
 
 class CharTokenizer(Tokenizer):
@@ -95,6 +107,10 @@ class CharTokenizer(Tokenizer):
   @property
   def padding_id(self) -> int:
     return 0
+
+  @property
+  def vocab_size(self) -> int:
+    return 128
 
 
 class PaddingTokenizer(Tokenizer):
@@ -118,3 +134,7 @@ class PaddingTokenizer(Tokenizer):
   @property
   def padding_id(self) -> int:
     return self.tokenizer.padding_id
+
+  @property
+  def vocab_size(self) -> int:
+    return self.tokenizer.vocab_size
