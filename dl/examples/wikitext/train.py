@@ -29,7 +29,7 @@ def train(_):
   gin.add_config_file_search_path('./dl/rnn/configs/')
   gin.add_config_file_search_path('./dl/examples/wikitext/configs/')
 
-  configs = FLAGS.ginc + [f'{FLAGS.model_name}']
+  configs = [f'{FLAGS.model_name}'] + FLAGS.ginc
   configs = [f'{f}.gin' if not f.endswith('.gin') else f for f in configs]
   gin_params = FLAGS.ginp + [
       f'exp_name = "{FLAGS.exp_name}"',

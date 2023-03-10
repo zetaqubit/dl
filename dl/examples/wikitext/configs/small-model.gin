@@ -1,3 +1,6 @@
+include 'dl/data/configs/data_owt.gin'
+include 'dl/data/configs/tok_gpt2.gin'
+
 model_name = 'small-model'
 
 batch_size = 32
