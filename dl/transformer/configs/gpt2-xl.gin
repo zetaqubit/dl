@@ -1,3 +1,5 @@
+include 'dl/transformer/configs/autoregressive.gin'
+
 model_name = 'gpt2-xl'
 
 batch_size = 4

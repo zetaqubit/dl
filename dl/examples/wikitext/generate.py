@@ -7,10 +7,9 @@ import gin
 import torch
 import transformers as hf_transformers
 
-from dl.data import tokenizers
 from dl.examples.wikitext import checkpoint
-from dl.transformer import transformer
-from dl.utils.config_utils import gin_get
+from dl.data import dataset
+from dl.models import models
 
 flags.DEFINE_string('model_name', None, 'Model name - one of configs.')
 flags.DEFINE_string('exp_name', None, 'Experiment name to load from.')
@@ -22,19 +21,18 @@ MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 
 def load_model(dir):
-  tokenizer = tokenizers.create()
-  model = transformer.AutoregressiveModel(tokenizer=tokenizer)
+  model = models.create()
   checkpoint.load_ckpt(dir, model)
   model.eval()
   model.cuda()
-  return model, tokenizer
+  return model
 
 
 def generate(_):
   exp_dir = os.path.join(MODEL_DIR, FLAGS.model_name, FLAGS.exp_name)
   gin.parse_config_file(f'{exp_dir}/config.gin')
 
-  model, tokenizer = load_model(exp_dir)
+  model = load_model(exp_dir)
 
   while True:
     try:

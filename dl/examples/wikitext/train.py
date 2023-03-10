@@ -27,6 +27,7 @@ FLAGS = flags.FLAGS
 def train(_):
   gin.add_config_file_search_path('./dl/data/configs/')
   gin.add_config_file_search_path('./dl/rnn/configs/')
+  gin.add_config_file_search_path('./dl/transformer/configs/')
   gin.add_config_file_search_path('./dl/examples/wikitext/configs/')
 
   configs = [f'{FLAGS.model_name}'] + FLAGS.ginc

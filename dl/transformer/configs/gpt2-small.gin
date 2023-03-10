@@ -1,7 +1,6 @@
-include 'dl/data/configs/data_owt.gin'
-include 'dl/data/configs/tok_gpt2.gin'
+include 'dl/transformer/configs/autoregressive.gin'
 
-model_name = 'small-model'
+model_name = 'gpt2-small'
 
 batch_size = 32
 max_seq_len = 128
@@ -15,7 +14,5 @@ ckpt_steps = 100
 GPT.n_layers = 4
 GPT.dim = 512
 GPT.max_seq_len = %max_seq_len
-
-AutoregressiveModel.net = @GPT
 
 SelfAttention.heads = 2

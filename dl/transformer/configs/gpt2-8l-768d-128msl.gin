@@ -1,4 +1,6 @@
-model_name = 'gpt-8l-768d-128msl'
+include 'dl/transformer/configs/autoregressive.gin'
+
+model_name = 'gpt2-8l-768d-128msl'
 
 batch_size = 32
 max_seq_len = 128
@@ -14,5 +16,6 @@ GPT.dim = 768
 GPT.max_seq_len = %max_seq_len
 
 AutoregressiveModel.net = @GPT
+models.create.net = @AutoregressiveModel
 
 SelfAttention.heads = 8

@@ -1,5 +1,4 @@
-include 'dl/data/configs/data_enwik8.gin'
-include 'dl/data/configs/tok_char.gin'
+include "dl/rnn/configs/generative_rnn.gin"
 
 model_name = 'rnn-small'
 
@@ -20,5 +19,3 @@ RNNCell.activation_hx = @torch.tanh
 
 RnnLM.n_layers = 4
 RnnLM.dim = %dim
-
-GenerativeRnnModel.net = @RnnLM

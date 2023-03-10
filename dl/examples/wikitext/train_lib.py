@@ -20,8 +20,8 @@ import tqdm
 from dl.data import dataset
 from dl.data import tokenizers
 from dl.examples.wikitext import checkpoint
+from dl.models import models
 from dl.rnn import rnn
-from dl.transformer import transformer
 from dl.utils.config_utils import gin_get
 
 
@@ -106,8 +106,7 @@ def train():
   eval_steps = gin_get('%eval_steps')
   ckpt_steps = gin_get('%ckpt_steps')
 
-  # model = transformer.AutoregressiveModel(tokenizer=tokenizer)
-  model = rnn.GenerativeRnnModel(tokenizer=tokenizer)
+  model = models.create()
   model.cuda()
   optim = torch.optim.Adam(model.parameters(),
                           lr=gin_get('%learning_rate'))
