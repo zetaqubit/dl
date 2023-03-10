@@ -1,7 +1,10 @@
+include 'dl/data/configs/data_enwik8.gin'
+include 'dl/data/configs/tok_char.gin'
+
 model_name = 'rnn-small'
 
 batch_size = 32
-max_seq_len = 128
+max_seq_len = 32
 learning_rate = 1e-4
 train_steps = 100
 log_steps = 10
@@ -9,7 +12,7 @@ eval_interval = 10
 eval_steps = 1
 ckpt_steps = 100
 
-dim = 128
+dim = 256
 
 RNNCell.hidden_size = %dim
 RNNCell.activation_hh = @torch.tanh
@@ -17,15 +20,5 @@ RNNCell.activation_hx = @torch.tanh
 
 RnnLM.n_layers = 4
 RnnLM.dim = %dim
-RnnLM.max_seq_len = None
 
-GenerativeRnnModel.net = @RnnLM()
-
-dataset = 'enwik8'
-tok_type = 'char'
-RnnLM.vocab = 256
-GenerativeRnnModel.ignore_index = 0
-
-# tok_type = 'gpt2'
-# RnnLM.vocab = 50257
-# GenerativeRnnModel.ignore_index = 50256
+GenerativeRnnModel.net = @RnnLM

@@ -106,7 +106,8 @@ def train():
   eval_steps = gin_get('%eval_steps')
   ckpt_steps = gin_get('%ckpt_steps')
 
-  model = transformer.AutoregressiveModel(tokenizer=tokenizer)
+  # model = transformer.AutoregressiveModel(tokenizer=tokenizer)
+  model = rnn.GenerativeRnnModel(tokenizer=tokenizer)
   model.cuda()
   optim = torch.optim.Adam(model.parameters(),
                           lr=gin_get('%learning_rate'))

@@ -1,4 +1,5 @@
 """Implementations of various RNN architectures."""
+from typing import Callable
 
 import gin.torch
 from einops import rearrange
@@ -63,7 +64,7 @@ class RNN(nn.Module):
 @gin.configurable
 class RnnLM(nn.Module):
   """Language model backed by a RNN."""
-  def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
+  def __init__(self, n_layers: int, dim: int, vocab: int):
     super().__init__()
     self.n_layers = n_layers
     self.dim = dim
@@ -72,8 +73,6 @@ class RnnLM(nn.Module):
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
     self.lm_head = nn.Linear(dim, vocab, bias=False)
     self.lm_head.weight = self.wte.weight  # tie embedding weight
-
-    self.max_seq_len = max_seq_len
 
     # Initialize weights.
     self.apply(self.init_weights_)
@@ -121,14 +120,12 @@ class GenerativeRnnModel(nn.Module):
     - Tokenization (text str <-> ids).
     - Generate text via a prompt.
   """
-  def __init__(self, net: nn.Module,
-               tokenizer: tokenizers.Tokenizer,
-               ignore_index: int):
+  def __init__(self, net: Callable[[], nn.Module],
+               tokenizer: tokenizers.Tokenizer):
     super().__init__()
-    self.net = net
+    self.net = net(vocab=tokenizer.vocab_size)
     self.tokenizer = tokenizer
-    self.ignore_index = ignore_index
-    self.max_seq_len = net.max_seq_len
+    self.ignore_index = tokenizer.padding_id
 
   def forward(self, x, teacher_forcing='all'):  # [batch, seq] -> loss
     inputs, targets = x[:, :-1], x[:, 1:]

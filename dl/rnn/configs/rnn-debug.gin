@@ -1,3 +1,6 @@
+include 'dl/data/configs/data_enwik8.gin'
+include 'dl/data/configs/tok_char.gin'
+
 model_name = 'rnn-debug'
 
 batch_size = 2
@@ -17,8 +20,6 @@ RNNCell.activation_hx = @torch.tanh
 
 RnnLM.n_layers = 1
 RnnLM.dim = %dim
-RnnLM.max_seq_len = None
 RnnLM.vocab = 10
 
-GenerativeRnnModel.net = @RnnLM()
-GenerativeRnnModel.ignore_index = 0
+GenerativeRnnModel.net = @RnnLM
