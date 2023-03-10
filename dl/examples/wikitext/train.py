@@ -31,10 +31,10 @@ def train(_):
 
   configs = [f'{FLAGS.model_name}'] + FLAGS.ginc
   configs = [f'{f}.gin' if not f.endswith('.gin') else f for f in configs]
-  gin_params = FLAGS.ginp + [
+  gin_params = [
       f'exp_name = "{FLAGS.exp_name}"',
       f'resume = "{FLAGS.resume}"',
-  ]
+  ] + FLAGS.ginp
   print(configs, gin_params)
   gin.parse_config_files_and_bindings(configs, gin_params)
   final_metrics = train_lib.train()
