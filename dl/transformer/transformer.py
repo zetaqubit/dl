@@ -1,4 +1,5 @@
 """Implementation of the transformer from Attention is All You Need."""
+from typing import Callable
 
 import gin
 from einops import rearrange
@@ -151,14 +152,13 @@ class AutoregressiveModel(nn.Module):
     - Tokenization (text str <-> ids).
     - Generate text via a prompt.
   """
-  def __init__(self, net: nn.Module,
-               tokenizer: tokenizers.Tokenizer,
-               ignore_index: int):
+  def __init__(self, net: Callable[[], nn.Module],
+               tokenizer: tokenizers.Tokenizer):
     super().__init__()
-    self.net = net
+    self.net = net(vocab=tokenizer.vocab_size)
     self.tokenizer = tokenizer
-    self.ignore_index = ignore_index
-    self.max_seq_len = net.max_seq_len
+    self.ignore_index = tokenizer.padding_id
+    self.max_seq_len = self.net.max_seq_len
 
   def forward(self, x):  # [batch, seq] -> loss
     inputs, targets = x[:, :-1], x[:, 1:]

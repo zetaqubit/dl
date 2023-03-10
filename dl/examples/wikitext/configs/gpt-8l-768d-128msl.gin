@@ -9,12 +9,13 @@ eval_interval = 1000
 eval_steps = 10
 ckpt_steps = 2_000
 
+tokenizers.create.tok_type = 'gpt2'
+tokenizers.create.max_seq_len = %max_seq_len
+
 GPT.n_layers = 8
 GPT.dim = 768
 GPT.max_seq_len = %max_seq_len
-GPT.vocab = 50257
 
-AutoregressiveModel.net = @GPT()
-AutoregressiveModel.ignore_index = 50256
+AutoregressiveModel.net = @GPT
 
 SelfAttention.heads = 8
