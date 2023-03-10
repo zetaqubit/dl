@@ -1,0 +1,2 @@
+tokenizers.create.tok_type = 'char'
+tokenizers.create.max_seq_len = %max_seq_len

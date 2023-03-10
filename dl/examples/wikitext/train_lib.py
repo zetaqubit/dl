@@ -67,6 +67,7 @@ MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 def train():
   torch.manual_seed(42)
+  print(gin.config_str())
 
   model_name = gin_get('%model_name')
   exp_name = gin_get('%exp_name')
@@ -79,15 +80,15 @@ def train():
 
   max_seq_len = gin_get('%max_seq_len')
 
-  tok_type = gin_get('%tok_type', 'gpt2')
-  tokenizer = tokenizers.create(tok_type)
+  tok_type = gin_get('tokenizers.create.tok_type')
+  tokenizer = tokenizers.create()
 
   ds_name = gin_get('%dataset', 'openwebtext')
+  print(f'Loading dataset {ds_name}/{tok_type}.train.bin')
   ds_train = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.train',
                                          max_seq_len+1)
   ds_valid = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.val',
                                          max_seq_len+1)
-  print(f'Loaded dataset {ds_name}/{tok_type}.train')
 
   batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
