@@ -1,0 +1,22 @@
+include "dl/rnn/configs/generative_rnn.gin"
+
+model_name = 'rnn-medium'
+
+batch_size = 32
+max_seq_len = 128
+learning_rate = 1e-4
+train_steps = 10_000
+log_steps = 10
+eval_interval = 100
+eval_steps = 2
+ckpt_steps = 1000
+
+dim = 512
+
+RNNCell.hidden_size = %dim
+RNNCell.activation_hh = @torch.tanh
+
+RNN.activation_ho = None
+
+RnnLM.n_layers = 8
+RnnLM.dim = %dim
