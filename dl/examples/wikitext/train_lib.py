@@ -179,6 +179,8 @@ def train():
     for _ in range(accum_grad_steps):
       ids = next(iter_train)
       loss = model(ids.to('cuda'))
+      # loss += model(ids.to('cuda'), teacher_forcing='first_half')
+      # loss /= 2
       (loss / accum_grad_steps).backward()
       tokens_seen += (ids.detach() != model.ignore_index).sum().item()
       tokens_total += ids.shape[0] * ids.shape[1]
