@@ -15,7 +15,8 @@ dim = 6
 
 RNNCell.hidden_size = %dim
 RNNCell.activation_hh = @torch.tanh
-RNNCell.activation_hx = @torch.tanh
+
+RNN.activation_ho = None
 
 RnnLM.n_layers = 1
 RnnLM.dim = %dim

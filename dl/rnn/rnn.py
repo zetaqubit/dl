@@ -3,6 +3,7 @@ from typing import Callable
 
 import gin.torch
 from einops import rearrange
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
@@ -15,13 +16,11 @@ gin.external_configurable(torch.tanh, module='torch')
 
 @gin.configurable
 class RNNCell(nn.Module):
-  def __init__(self, hidden_size, activation_hh, activation_hx):
+  def __init__(self, hidden_size, activation_hh):
     super().__init__()
     self.activation_hh = activation_hh
-    self.activation_hx = activation_hx
     self.wxh = nn.Linear(hidden_size, hidden_size)
     self.whh = nn.Linear(hidden_size, hidden_size)
-    self.who = nn.Linear(hidden_size, hidden_size)
 
   def forward(self, x, h):
     """
@@ -30,15 +29,17 @@ class RNNCell(nn.Module):
       h: [batch, hidden_size]
     """
     h_t = self.activation_hh(self.whh(h) + self.wxh(x))
-    x_t = self.activation_hx(self.who(h_t))
-    return x_t, h_t
+    return h_t
 
 
+@gin.configurable
 class RNN(nn.Module):
-  def __init__(self, n_layers):
+  def __init__(self, n_layers, hidden_size, activation_ho):
     super().__init__()
     self.n_layers = n_layers
     self.rnn_cells = nn.ModuleList([RNNCell() for _ in range(n_layers)])
+    self.who = nn.Linear(hidden_size, hidden_size)
+    self.activation_ho = activation_ho
 
   def forward(self, x, hs):
     """Runs RNN forward by 1 timestep.
@@ -57,8 +58,12 @@ class RNN(nn.Module):
 
     hs_outs = [None] * len(self.rnn_cells)
     for i, cell in enumerate(self.rnn_cells):
-      x, hs_outs[i] = cell(x, hs[:, i, :])
-    return x, torch.stack(hs_outs, dim=1)
+      hs_outs[i] = cell(x, hs[:, i, :])
+      x = hs_outs[i]
+    out = self.who(hs_outs[-1])
+    if self.activation_ho:
+      out = self.activation_ho(out)
+    return out, torch.stack(hs_outs, dim=1)
 
 
 @gin.configurable
@@ -69,7 +74,7 @@ class RnnLM(nn.Module):
     self.n_layers = n_layers
     self.dim = dim
     self.vocab = vocab
-    self.rnn = RNN(n_layers)
+    self.rnn = RNN(n_layers=n_layers, hidden_size=dim)
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
     self.lm_head = nn.Linear(dim, vocab, bias=False)
     self.lm_head.weight = self.wte.weight  # tie embedding weight
@@ -92,10 +97,12 @@ class RnnLM(nn.Module):
     logits_seq = [None] * seq_len
     x = xs[:, 0, :]
     for t in range(seq_len):
-      x, hs = self.rnn(x, hs)
-      logits = self.lm_head(x)
+      y, hs = self.rnn(x, hs)
+      logits = self.lm_head(y)
       logits_seq[t] = logits
-      if not teacher_force_mask[t]:
+      if teacher_force_mask[t]:
+        x = xs[:, t, :]
+      else:
         probs = F.softmax(logits, dim=-1)
         id = torch.multinomial(probs, 1)  # [b, 1]
         x = self.wte(id)  # [b, 1, dim]

@@ -3,19 +3,20 @@ include "dl/rnn/configs/generative_rnn.gin"
 model_name = 'rnn-small'
 
 batch_size = 32
-max_seq_len = 32
+max_seq_len = 128
 learning_rate = 1e-4
 train_steps = 100
 log_steps = 10
 eval_interval = 10
 eval_steps = 1
-ckpt_steps = 100
+ckpt_steps = 1000
 
-dim = 256
+dim = 128
 
 RNNCell.hidden_size = %dim
 RNNCell.activation_hh = @torch.tanh
-RNNCell.activation_hx = @torch.tanh
+
+RNN.activation_ho = None
 
 RnnLM.n_layers = 4
 RnnLM.dim = %dim
