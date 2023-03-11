@@ -105,11 +105,11 @@ class RnnLM(nn.Module):
 
   def init_weights_(self, module):
     if isinstance(module, nn.Linear):
-        torch.nn.init.normal_(module.weight, mean=0.0, std=0.2)
+        torch.nn.init.normal_(module.weight, mean=0.0, std=np.sqrt(1/self.dim))
         if module.bias is not None:
             torch.nn.init.zeros_(module.bias)
     elif isinstance(module, nn.Embedding):
-        torch.nn.init.normal_(module.weight, mean=0.0, std=0.2)
+        torch.nn.init.normal_(module.weight, mean=0.0, std=np.sqrt(1/self.dim))
 
 @gin.configurable
 class GenerativeRnnModel(nn.Module):
