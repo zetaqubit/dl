@@ -1,18 +1,21 @@
 include 'dl/transformer/configs/autoregressive.gin'
 
-model_name = 'gpt2-small'
+model_name = 'gpt2-medium'
 
-batch_size = 32
+accum_grad_steps = 1
+batch_size = 16
 max_seq_len = 128
-learning_rate = 1e-4
+learning_rate = 2e-5
 train_steps = 100_000
 log_steps = 100
 eval_interval = 1000
 eval_steps = 5
 ckpt_steps = 20_000
 
-GPT.n_layers = 12
-GPT.dim = 768
+GPT.n_layers = 24
+GPT.dim = 1024
 GPT.max_seq_len = %max_seq_len
 
-SelfAttention.heads = 12
+AutoregressiveModel.net = @GPT
+
+SelfAttention.heads = 16
