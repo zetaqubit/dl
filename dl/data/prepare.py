@@ -1,10 +1,18 @@
 '''Prepares data for training - downloading, splitting, tokenizing.
 
-Due to quirks of the huggingface dataset preprocessing and how it tries to
-pickle the map function, the main part of this script cannot be in a function.
-
 To read the bin files later, e.g. with numpy:
   m = np.memmap('train.bin', dtype=np.uint16, mode='r')
+
+Supported datasets:
+  - enwik8
+  - wikitext-103
+  - openwebtext
+  - ptb: Penn Treebank
+
+
+Supported tokenizers:
+  - char: ASCII character tokenizer (ignores non-ASCII)
+  - gpt2
 '''
 
 import os
@@ -24,7 +32,7 @@ FLAGS = flags.FLAGS
 
 # number of workers in .map() call
 # good number to use is ~order number of cpu cores // 2
-_NUM_PROC = 24
+_NUM_PROC = 12
 
 
 def prepare(dataset, tok_type):
@@ -34,10 +42,13 @@ def prepare(dataset, tok_type):
 
   if dataset == 'wikitext-103':
     ds = load_dataset(path='wikitext', name='wikitext-103-v1')
+  elif dataset == 'ptb':
+    ds = load_dataset('ptb_text_only')
+    ds = ds.rename_column('sentence', 'text')
   else:
     ds = load_dataset(dataset)
 
-  if dataset in ('wikitext-103'):
+  if dataset in ('wikitext-103', 'ptb'):
     # These datasets have a validation split, so just rename it.
     ds['val'] = ds.pop('validation')  # rename
   elif dataset in ('enwik8'):
