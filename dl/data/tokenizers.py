@@ -11,6 +11,17 @@ import transformers as hf_transformers
 
 
 class Tokenizer(abc.ABC):
+  # Capture constructor args to make this class pickle-able.
+  def __init__(self, **kwargs):
+    self.args = frozenset(kwargs.items())
+
+  def __getstate__(self):
+    return self.args
+
+  def __setstate__(self, state):
+    state = dict(state)
+    self.__init__(**state)
+
   @abc.abstractmethod
   def encode_batch(self, texts: List[str]) -> List[List[int]]:
     pass
@@ -55,6 +66,7 @@ def create(tok_type: str, max_seq_len=None) -> Tokenizer:
 
 class TikTokenTokenizer(Tokenizer):
   def __init__(self, tok_type: str):
+    super().__init__(tok_type=tok_type)
     self.tokenizer = tiktoken.get_encoding(tok_type)
 
   def encode_batch(self, texts, **kwargs):
@@ -74,6 +86,7 @@ class TikTokenTokenizer(Tokenizer):
 
 class HuggingFaceTokenizer(Tokenizer):
   def __init__(self, tok_type: str):
+    super().__init__(tok_type=tok_type)
     self.tokenizer = hf_transformers.AutoTokenizer.from_pretrained(tok_type)
     self.tokenizer.pad_token = self.tokenizer.eos_token
 
@@ -94,6 +107,7 @@ class HuggingFaceTokenizer(Tokenizer):
 
 class CharTokenizer(Tokenizer):
   def __init__(self, drop_non_ascii=True):
+    super().__init__(drop_non_ascii=drop_non_ascii)
     self.drop_non_ascii = drop_non_ascii
 
   def encode_batch(self, texts):
@@ -115,6 +129,7 @@ class CharTokenizer(Tokenizer):
 
 class PaddingTokenizer(Tokenizer):
   def __init__(self, tokenizer: Tokenizer, max_seq_len: int):
+    super().__init__(tokenizer=tokenizer, max_seq_len=max_seq_len)
     self.tokenizer = tokenizer
     self.max_seq_len = max_seq_len
 
