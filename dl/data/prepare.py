@@ -21,6 +21,7 @@ from absl import app
 from absl import flags
 from datasets import load_dataset  # huggingface datasets
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
 from dl.data import tokenizers
@@ -70,11 +71,10 @@ def prepare(dataset, tok_type):
   assert tokenizer.vocab_size < 2**16, 'Max token exceeds uint16'
 
   def process(example):
-      ids = tokenizer.encode(example['text']) # encode_ordinary ignores any special tokens
-      ids.append(tokenizer.padding_id) # add the end of text token, e.g. 50256 for gpt2 bpe
-      # note: I think eot should be prepended not appended... hmm. it's called 'eot' though...
-      out = {'ids': ids, 'len': len(ids)}
-      return out
+    ids = tokenizer.encode(example['text'])
+    ids.append(tokenizer.padding_id)
+    out = {'ids': ids, 'len': len(ids)}
+    return out
 
   # tokenize the dataset
   tokenized = ds.map(
@@ -86,17 +86,22 @@ def prepare(dataset, tok_type):
 
   # concatenate all the ids in each dataset into one large file we can use for training
   for split, dset in tokenized.items():
-      arr_len = np.sum(dset['len'])
-      filename = os.path.join(dataset_dir, f'{tok_type}.{split}.bin')
-      dtype = np.uint16
-      arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
+    arr_len = np.sum(dset['len'])
+    filename = os.path.join(dataset_dir, f'{tok_type}.{split}.bin')
+    dtype = np.uint16
+    arr = np.memmap(filename, dtype=dtype, mode='w+', shape=(arr_len,))
 
-      print(f'writing {filename}...')
-      idx = 0
-      for example in tqdm(dset):
-          arr[idx : idx + example['len']] = example['ids']
-          idx += example['len']
-      arr.flush()
+    print(f'writing {filename}...')
+    metadata_rows = []
+    idx = 0
+    for example in tqdm(dset):
+      metadata = {'example_offset': idx}
+      arr[idx : idx + example['len']] = example['ids']
+      idx += example['len']
+      metadata_rows.append(metadata)
+    arr.flush()
+    df_metadata = pd.DataFrame(metadata_rows)
+    df_metadata.to_csv(filename + '.meta', index=False)
 
 
 def main(_):
