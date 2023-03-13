@@ -44,21 +44,25 @@ def filter_example(example):
   text = example['text']
   return len(text) > 64 and not text.startswith(' =')
 
+
+_TEXT_SUMMARY = '''
+#### prompt
+{}
+#### generated
+{}
+#### ground truth
+{}
+'''
+
 @torch.no_grad()
 def text_completion_sxs(model, texts, num=2):
   # Example text and generation.
-  form = '''
-    | prompt       | {} |
-    | ground truth | {} |
-    | generated    | {} |
-  '''
   text = texts[0]
-  text = text.rstrip(' \n')
   words = text.split(' ')
   prompt, gt = ' '.join(words[:16]), ' '.join(words[16:])
   generated = model.generate(prompt, 128)
   generated = generated.strip('\n')
-  log_ex = form.format(prompt, gt, generated)
+  log_ex = _TEXT_SUMMARY.format(prompt, generated, gt)
   return log_ex
 
 
