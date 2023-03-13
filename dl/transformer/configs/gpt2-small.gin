@@ -3,13 +3,13 @@ include 'dl/transformer/configs/autoregressive.gin'
 model_name = 'gpt2-small'
 
 batch_size = 32
-max_seq_len = 128
+max_seq_len = 1024
 learning_rate = 1e-4
-train_steps = 100_000
+train_steps = 20_000
 log_steps = 100
-eval_interval = 1000
+eval_interval = 100
 eval_steps = 5
-ckpt_steps = 20_000
+ckpt_steps = 1_000
 
 GPT.n_layers = 12
 GPT.dim = 768
