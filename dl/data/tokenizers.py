@@ -116,7 +116,7 @@ class CharTokenizer(Tokenizer):
     return [list(encode_fn(text)) for text in texts]
 
   def decode_batch(self, ids):
-    return [''.join(chr(id) for seq in ids for id in seq)]
+    return [''.join(chr(id) for id in seq) for seq in ids]
 
   @property
   def padding_id(self) -> int:
