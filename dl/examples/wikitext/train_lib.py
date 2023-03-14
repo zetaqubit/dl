@@ -9,6 +9,7 @@ import os
 import shutil
 import signal
 
+from einops import rearrange
 import gin
 import numpy as np
 import pandas as pd
@@ -46,23 +47,28 @@ def filter_example(example):
 
 
 _TEXT_SUMMARY = '''
-#### prompt
-{}
 #### generated
 {}
 #### ground truth
+{}
+#### mle
 {}
 '''
 
 @torch.no_grad()
 def text_completion_sxs(model, texts, num=2):
   # Example text and generation.
+  n_prompt = 16
   text = texts[0]
   words = text.split(' ')
-  prompt, gt = ' '.join(words[:16]), ' '.join(words[16:])
-  generated = model.generate(prompt, 128)
-  generated = generated.strip('\n')
-  log_ex = _TEXT_SUMMARY.format(prompt, generated, gt)
+  prompt, gt = ' '.join(words[:n_prompt]), ' '.join(words[n_prompt:])
+  generated = prompt + model.generate(prompt, 128)
+  tok = model.tokenizer
+  in_ids = torch.tensor(tok.encode(text)).to('cuda')
+  in_ids = rearrange(in_ids, 's -> 1 s')
+  mle_ids = torch.argmax(model.net(in_ids), dim=-1)
+  mle = tok.decode_batch(mle_ids)[0]
+  log_ex = _TEXT_SUMMARY.format(generated, text, mle)
   return log_ex
 
 
@@ -87,18 +93,18 @@ def train():
   tok_type = gin_get('tokenizers.create.tok_type')
   tokenizer = tokenizers.create()
 
-  ds_name = gin_get('%dataset', 'openwebtext')
+  ds_name = gin_get('%dataset')
   print(f'Loading dataset {ds_name}/{tok_type}.train.bin')
-  ds_train = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.train',
-                                         max_seq_len+1)
-  ds_valid = dataset.MemoryMappedDataset(ds_name, f'{tok_type}.val',
-                                         max_seq_len+1)
+  ds_train = dataset.MemoryMappedDataset(
+      name=ds_name, split=f'{tok_type}.train', block_size=max_seq_len+1)
+  ds_valid = dataset.MemoryMappedDataset(
+      name=ds_name, split=f'{tok_type}.val', block_size=max_seq_len+1)
 
   batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
-    dataset=ds_train, batch_size=batch_size) #, shuffle=True)
+      dataset=ds_train, batch_size=batch_size)
   dl_valid = torch.utils.data.DataLoader(
-    dataset=ds_valid, batch_size=batch_size) #, shuffle=False)
+      dataset=ds_valid, batch_size=batch_size)
   iter_train = cycle(dl_train)
 
   ids_valid = next(iter(dl_valid))
