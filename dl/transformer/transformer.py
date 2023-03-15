@@ -187,7 +187,7 @@ class AutoregressiveModel(nn.Module):
     out = ids
     for _ in range(seq_len):
       x = out[:, -self.max_seq_len:]  # [b, msl]
-      logits = self.net(x)[:, -1]  # [b, v]
+      logits = self.net(x)[:, -1, :]  # [b, v]
       probs = F.softmax(logits / temperature, dim=-1)
       sample = torch.multinomial(probs, 1)  # [b, 1]
       out = torch.cat((out, sample), dim=-1)  # [b, s]
