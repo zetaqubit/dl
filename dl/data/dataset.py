@@ -11,11 +11,13 @@ DATA_ROOT = '/home/z/data/zetaqubit/dl/data'
 
 @gin.configurable
 class MemoryMappedDataset(torch.utils.data.Dataset):
-  def __init__(self, name, split, block_size, dbg_num_blocks=None):
+  def __init__(self, name, split, block_size, dbg_num_blocks=None,
+               padding_token=None):
     path = f'{DATA_ROOT}/{name}/{split}.bin'
     self.data = np.memmap(path, dtype=np.uint16, mode='r')
     self.block_size = block_size
     self.dataset_size = len(self.data)
+    self.padding_token = padding_token
     if dbg_num_blocks is not None:
       self.dataset_size = min(self.dataset_size,
                               int(dbg_num_blocks * self.block_size) + 1)
@@ -26,7 +28,15 @@ class MemoryMappedDataset(torch.utils.data.Dataset):
   def __getitem__(self, _):
     # Break contract and return a random span.
     ix = torch.randint(self.dataset_size - self.block_size, (1,))
-    x = torch.from_numpy(self.data[ix:ix+self.block_size].astype(np.int64))
+    x = self.data[ix:ix+self.block_size]
+
+    # Mark as padding all tokens to the right of the first padding token.
+    if self.padding_token is not None:
+      padding_mask = x == self.padding_token
+      padding_mask = np.clip(np.cumsum(padding_mask), 0, 1)
+      x = np.where(padding_mask, self.padding_token, x)
+
     # pin array x, which allows us to move them to GPU asynchronously (non_blocking=True)
+    x = torch.from_numpy(x.astype(np.int64))
     x = x.pin_memory().to('cuda', non_blocking=True)
     return x
