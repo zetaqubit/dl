@@ -19,7 +19,7 @@ import os
 
 from absl import app
 from absl import flags
-from datasets import load_dataset  # huggingface datasets
+import datasets as hf_datasets  # huggingface datasets
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -42,17 +42,22 @@ def prepare(dataset, tok_type):
     return
 
   if dataset == 'wikitext-103':
-    ds = load_dataset(path='wikitext', name='wikitext-103-v1')
+    ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
   elif dataset == 'ptb':
-    ds = load_dataset('ptb_text_only')
+    ds = hf_datasets.load_dataset('ptb_text_only')
     ds = ds.rename_column('sentence', 'text')
+  elif dataset == 'shakespeare':
+    df = pd.read_csv('dl/data/tiny_shakespeare.txt', delimiter='\t', header=0,
+                     names=['text'])
+    ds = hf_datasets.Dataset.from_pandas(df, split='train')
+    ds = hf_datasets.DatasetDict({'train': ds})
   else:
-    ds = load_dataset(dataset)
+    ds = hf_datasets.load_dataset(dataset)
 
   if dataset in ('wikitext-103', 'ptb'):
     # These datasets have a validation split, so just rename it.
     ds['val'] = ds.pop('validation')  # rename
-  elif dataset in ('enwik8'):
+  elif dataset in ('shakespeare', 'enwik8'):
     # These datasets don't have a validation split, so create it ourselves.
     ds = ds['train'].train_test_split(test_size=0.05, seed=2357, shuffle=True)
     ds['val'] = ds.pop('test')  # rename
@@ -106,7 +111,7 @@ def prepare(dataset, tok_type):
 
 def main(_):
   datasets = [FLAGS.dataset] if FLAGS.dataset else [
-    'enwik8', 'wikitext-103', 'openwebtext',
+    'shakespeare', 'enwik8', 'wikitext-103', 'openwebtext',
   ]
   tokenizers = [FLAGS.tokenizer] if FLAGS.tokenizer else [
     'char', 'gpt2',
