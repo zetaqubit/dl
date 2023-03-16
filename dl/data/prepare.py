@@ -41,8 +41,13 @@ def prepare(dataset, tok_type):
     print(f'{dataset} + {tok_type} combination too large. Skipping.')
     return
 
+  tokenizer = tokenizers.create(tok_type, max_seq_len=None)
+  assert tokenizer.vocab_size < 2**16, 'Max token exceeds uint16'
+
+  example_sep_token = tokenizer.padding_id
   if dataset == 'wikitext-103':
     ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
+    example_sep_token = '\n'
   elif dataset == 'ptb':
     ds = hf_datasets.load_dataset('ptb_text_only')
     ds = ds.rename_column('sentence', 'text')
@@ -51,8 +56,12 @@ def prepare(dataset, tok_type):
                      names=['text'])
     ds = hf_datasets.Dataset.from_pandas(df, split='train')
     ds = hf_datasets.DatasetDict({'train': ds})
+    example_sep_token = '\n'
   else:
     ds = hf_datasets.load_dataset(dataset)
+  example_sep_id = tokenizer.encode(example_sep_token)
+  assert len(example_sep_id) == 1
+  example_sep_id = example_sep_id[0]
 
   if dataset in ('wikitext-103', 'ptb'):
     # These datasets have a validation split, so just rename it.
@@ -72,12 +81,9 @@ def prepare(dataset, tok_type):
   os.makedirs(dataset_dir, exist_ok=True)
 
 
-  tokenizer = tokenizers.create(tok_type, max_seq_len=None)
-  assert tokenizer.vocab_size < 2**16, 'Max token exceeds uint16'
-
   def process(example):
     ids = tokenizer.encode(example['text'])
-    ids.append(tokenizer.padding_id)
+    ids.append(example_sep_id)
     out = {'ids': ids, 'len': len(ids)}
     return out
 
