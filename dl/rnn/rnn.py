@@ -201,6 +201,8 @@ class GenerativeRnnModel(nn.Module):
 
   # Same as above, but non-generator.
   def generate_text(self, **kwargs):
-    kwargs['continuous'] = False
+    was_training = self.net.training
+    self.net.eval()
     out = next(self.generate(**kwargs))
+    self.net.train(was_training)
     return out
