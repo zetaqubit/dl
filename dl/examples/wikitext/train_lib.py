@@ -61,7 +61,10 @@ def text_completion_sxs(model, texts, num=2):
   n_prompt = 16
   text = texts[0]
   words = text.split(' ')
-  prompt, gt = ' '.join(words[:n_prompt]), ' '.join(words[n_prompt:])
+  if len(words) > 2 * n_prompt:
+    prompt, gt = ' '.join(words[:n_prompt]), ' '.join(words[n_prompt:])
+  else:
+    prompt = text[:32]
   generated = prompt + model.generate(prompt, 128)
   tok = model.tokenizer
   in_ids = torch.tensor(tok.encode(text)).to('cuda')
