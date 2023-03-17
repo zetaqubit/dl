@@ -10,7 +10,7 @@ Implementations of different Deep Learning architectures and algorithms, using o
 
 ## rnn
 
-- [ ] Implement RNN
+- [x] Implement RNN
 - [ ] Implement LSTM
 
 ## examples/wikitext
