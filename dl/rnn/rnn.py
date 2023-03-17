@@ -127,12 +127,11 @@ class GenerativeRnnModel(nn.Module):
     - Tokenization (text str <-> ids).
     - Generate text via a prompt.
   """
-  def __init__(self, net: Callable[[], nn.Module],
-               tokenizer: tokenizers.Tokenizer):
+  def __init__(self, net: Callable[[], nn.Module]):
     super().__init__()
-    self.net = net(vocab=tokenizer.vocab_size)
-    self.tokenizer = tokenizer
-    self.ignore_index = tokenizer.padding_id
+    self.tokenizer = tokenizers.create(max_seq_len=None)
+    self.net = net(vocab=self.tokenizer.vocab_size)
+    self.ignore_index = self.tokenizer.padding_id
 
   def forward(self, x, teacher_forcing='all'):  # [batch, seq] -> loss
     inputs, targets = x[:, :-1], x[:, 1:]

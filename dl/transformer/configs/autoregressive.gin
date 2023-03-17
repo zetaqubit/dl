@@ -2,5 +2,4 @@ include 'dl/data/configs/data_owt.gin'
 include 'dl/data/configs/tok_gpt2.gin'
 
 AutoregressiveModel.net = @GPT
-AutoregressiveModel.tokenizer = @tokenizers.create()
 models.create.net = @AutoregressiveModel()

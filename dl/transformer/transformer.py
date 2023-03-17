@@ -152,12 +152,11 @@ class AutoregressiveModel(nn.Module):
     - Tokenization (text str <-> ids).
     - Generate text via a prompt.
   """
-  def __init__(self, net: Callable[[], nn.Module],
-               tokenizer: tokenizers.Tokenizer):
+  def __init__(self, net: Callable[[], nn.Module]):
     super().__init__()
-    self.net = net(vocab=tokenizer.vocab_size)
-    self.tokenizer = tokenizer
-    self.ignore_index = tokenizer.padding_id
+    self.tokenizer = tokenizers.create(max_seq_len=None)
+    self.net = net(vocab=self.tokenizer.vocab_size)
+    self.ignore_index = self.tokenizer.padding_id
     self.max_seq_len = self.net.max_seq_len
 
   def forward(self, x):  # [batch, seq] -> loss
@@ -187,7 +186,7 @@ class AutoregressiveModel(nn.Module):
     out = ids
     for _ in range(seq_len):
       x = out[:, -self.max_seq_len:]  # [b, msl]
-      logits = self.net(x)[:, -1, :]  # [b, v]
+      logits = self.net(x)[:, -1]  # [b, v]
       probs = F.softmax(logits / temperature, dim=-1)
       sample = torch.multinomial(probs, 1)  # [b, 1]
       out = torch.cat((out, sample), dim=-1)  # [b, s]

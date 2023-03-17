@@ -2,5 +2,4 @@ include 'dl/data/configs/data_enwik8.gin'
 include 'dl/data/configs/tok_char.gin'
 
 GenerativeRnnModel.net = @RnnLM
-GenerativeRnnModel.tokenizer = @tokenizers.create()
 models.create.net = @GenerativeRnnModel()
