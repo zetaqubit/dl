@@ -44,10 +44,10 @@ def prepare(dataset, tok_type):
   tokenizer = tokenizers.create(tok_type, max_seq_len=None)
   assert tokenizer.vocab_size < 2**16, 'Max token exceeds uint16'
 
-  example_sep_token = tokenizer.padding_id
+  sep_ids = [tokenizer.padding_id]
   if dataset == 'wikitext-103':
     ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
-    example_sep_token = '\n'
+    sep_ids = tokenizer.encode('\n')
   elif dataset == 'ptb':
     ds = hf_datasets.load_dataset('ptb_text_only')
     ds = ds.rename_column('sentence', 'text')
@@ -56,17 +56,20 @@ def prepare(dataset, tok_type):
                      names=['text'])
     ds = hf_datasets.Dataset.from_pandas(df, split='train')
     ds = hf_datasets.DatasetDict({'train': ds})
-    example_sep_token = '\n'
+    sep_ids = tokenizer.encode('\n')
+  elif dataset == 'abc':
+    abc = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    ds = hf_datasets.DatasetDict({
+      'train': hf_datasets.Dataset.from_dict({'text': [abc] * 1000}),
+    })
+    sep_ids = []
   else:
     ds = hf_datasets.load_dataset(dataset)
-  example_sep_id = tokenizer.encode(example_sep_token)
-  assert len(example_sep_id) == 1
-  example_sep_id = example_sep_id[0]
 
   if dataset in ('wikitext-103', 'ptb'):
     # These datasets have a validation split, so just rename it.
     ds['val'] = ds.pop('validation')  # rename
-  elif dataset in ('shakespeare', 'enwik8'):
+  elif dataset in ('abc', 'shakespeare', 'enwik8'):
     # These datasets don't have a validation split, so create it ourselves.
     ds = ds['train'].train_test_split(test_size=0.05, seed=2357, shuffle=True)
     ds['val'] = ds.pop('test')  # rename
@@ -83,7 +86,7 @@ def prepare(dataset, tok_type):
 
   def process(example):
     ids = tokenizer.encode(example['text'])
-    ids.append(example_sep_id)
+    ids.extend(sep_ids)
     out = {'ids': ids, 'len': len(ids)}
     return out
 
@@ -117,7 +120,7 @@ def prepare(dataset, tok_type):
 
 def main(_):
   datasets = [FLAGS.dataset] if FLAGS.dataset else [
-    'shakespeare', 'enwik8', 'wikitext-103', 'openwebtext',
+    'abc', 'shakespeare', 'enwik8', 'wikitext-103', 'openwebtext',
   ]
   tokenizers = [FLAGS.tokenizer] if FLAGS.tokenizer else [
     'char', 'gpt2',
