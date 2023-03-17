@@ -13,6 +13,7 @@ from dl.models import models
 
 flags.DEFINE_string('model_name', None, 'Model name - one of configs.')
 flags.DEFINE_string('exp_name', None, 'Experiment name to load from.')
+flags.DEFINE_float('temperature', 1, 'Temperature to use during sampling.')
 
 FLAGS = flags.FLAGS
 
@@ -41,7 +42,8 @@ def generate(_):
       print()
       break
     out_text = model.generate(prompt,
-                              seq_len=gin.query_parameter('%max_seq_len'))
+                              seq_len=gin.query_parameter('%max_seq_len'),
+                              temperature=FLAGS.temperature)
     print(out_text)
 
 
