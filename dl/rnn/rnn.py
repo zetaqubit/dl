@@ -100,8 +100,10 @@ class RnnLM(nn.Module):
       y, hs = self.rnn(x, hs)
       logits = self.lm_head(y)
       logits_seq[t] = logits
-      if teacher_force_mask[t]:
-        x = xs[:, t, :]
+      if t == seq_len - 1:
+        break
+      if teacher_force_mask[t+1]:
+        x = xs[:, t+1, :]
       else:
         probs = F.softmax(logits, dim=-1)
         id = torch.multinomial(probs, 1)  # [b, 1]
