@@ -11,8 +11,8 @@ def save_ckpt(dir, model, optimizer, step=None, **kwargs):
     ckpts = find_ckpts(dir)
     if not ckpts:
       raise FileNotFoundError(f'No checkpoint in {dir} to symlink.')
+    print(f'Symlinking {path} -> {ckpts[-1]}')
     symlink_force(ckpts[-1], path)
-    print(f'Symlinked {path} -> {ckpts[-1]}')
     return
 
   path = f'{dir}/model-{step}.pt'
