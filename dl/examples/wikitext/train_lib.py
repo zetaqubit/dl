@@ -65,7 +65,8 @@ def text_completion_sxs(model, texts, num=2):
     prompt, gt = ' '.join(words[:n_prompt]), ' '.join(words[n_prompt:])
   else:
     prompt = text[:32]
-  generated = prompt + model.generate(prompt, 128)
+  generated = prompt + model.generate_text(prompt=prompt,
+                                           seq_len=gin_get('%max_seq_len'))
   tok = model.tokenizer
   in_ids = torch.tensor(tok.encode(text)).to('cuda')
   in_ids = rearrange(in_ids, 's -> 1 s')

@@ -172,7 +172,8 @@ class AutoregressiveModel(nn.Module):
                prompt,
                seq_len,
                temperature=1,
-               ):  # [batch, seq] -> [batch, seq_len]
+               continuous=True,
+               ):  # [batch, seq] -> generator of [batch, seq_len]s
     """Text prompt -> text output."""
     was_training = self.net.training
     self.net.eval()
@@ -183,17 +184,27 @@ class AutoregressiveModel(nn.Module):
       prompt = [prompt]
     ids = torch.tensor(self.tokenizer.encode_batch(prompt), device='cuda')
     b, t = ids.shape
-    out = ids
-    for _ in range(seq_len):
-      x = out[:, -self.max_seq_len:]  # [b, msl]
-      logits = self.net(x)[:, -1]  # [b, v]
-      probs = F.softmax(logits / temperature, dim=-1)
-      sample = torch.multinomial(probs, 1)  # [b, 1]
-      out = torch.cat((out, sample), dim=-1)  # [b, s]
+
+    # Start generation.
+    while True:
+      out = ids
+      for _ in range(seq_len):
+        x = out[:, -self.max_seq_len:]  # [b, msl]
+        logits = self.net(x)[:, -1]  # [b, v]
+        probs = F.softmax(logits / temperature, dim=-1)
+        sample = torch.multinomial(probs, 1)  # [b, 1]
+        out = torch.cat((out, sample), dim=-1)  # [b, s]
+
+      ids_out = out[:, t:]
+      text_out = self.tokenizer.decode_batch(ids_out)
+      if not was_batched: text_out = text_out[0]
+      yield text_out
+      ids = ids_out
+      if not continuous: break
     self.net.train(was_training)
 
-    out = out[:, t:]
-    out = self.tokenizer.decode_batch(out)
-    if not was_batched: out = out[0]
-
+  # Same as above, but non-generator.
+  def generate_text(self, **kwargs):
+    kwargs['continuous'] = False
+    out = next(self.generate(**kwargs))
     return out

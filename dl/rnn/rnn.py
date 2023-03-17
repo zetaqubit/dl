@@ -160,7 +160,8 @@ class GenerativeRnnModel(nn.Module):
                prompt,
                seq_len,
                temperature=1,
-               ):  # [batch, seq] -> [batch, seq_len]
+               continuous=True,
+               ):  # [batch, seq] -> generator of [batch, seq_len]s
     """Text prompt -> text output."""
     was_training = self.net.training
     self.net.eval()
@@ -179,19 +180,27 @@ class GenerativeRnnModel(nn.Module):
       _, hs = self.net.rnn(xs[:, t, :], hs)
 
     # Start generation.
-    out = ids
-    x = xs[:, -1, :]
-    for _ in range(seq_len):
-      y, hs = self.net.rnn(x, hs)
-      logits = self.net.lm_head(y)  # [b, v]
-      probs = F.softmax(logits / temperature, dim=-1)
-      sample = torch.multinomial(probs, 1)  # [b, 1]
-      out = torch.cat((out, sample), dim=-1)  # [b, s]
-      x = self.net.wte(sample)
-      x = rearrange(x, 'b 1 d -> b d')  # t = 1
+    while True:
+      out = ids
+      x = xs[:, -1, :]
+      for _ in range(seq_len):
+        y, hs = self.net.rnn(x, hs)
+        logits = self.net.lm_head(y)  # [b, v]
+        probs = F.softmax(logits / temperature, dim=-1)
+        sample = torch.multinomial(probs, 1)  # [b, 1]
+        out = torch.cat((out, sample), dim=-1)  # [b, s]
+        x = self.net.wte(sample)
+        x = rearrange(x, 'b 1 d -> b d')  # t = 1
+
+      out = out[:, prompt_len:]
+      out = self.tokenizer.decode_batch(out)
+      if not was_batched: out = out[0]
+      yield out
+      if not continuous: break
     self.net.train(was_training)
 
-    out = out[:, prompt_len:]
-    out = self.tokenizer.decode_batch(out)
-    if not was_batched: out = out[0]
+  # Same as above, but non-generator.
+  def generate_text(self, **kwargs):
+    kwargs['continuous'] = False
+    out = next(self.generate(**kwargs))
     return out

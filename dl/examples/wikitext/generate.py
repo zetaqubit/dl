@@ -14,6 +14,10 @@ from dl.models import models
 flags.DEFINE_string('model_name', None, 'Model name - one of configs.')
 flags.DEFINE_string('exp_name', None, 'Experiment name to load from.')
 flags.DEFINE_float('temperature', 1, 'Temperature to use during sampling.')
+flags.DEFINE_integer('seq_len', None,
+                     'Number of tokens to generate. Special cases: \n'
+                     '  None: use default from the model.\n'
+                     '  0: no limit - generate infinite tokens.\n')
 
 FLAGS = flags.FLAGS
 
@@ -34,6 +38,14 @@ def generate(_):
   gin.parse_config_file(f'{exp_dir}/config.gin')
 
   model = load_model(exp_dir)
+  seq_len = FLAGS.seq_len
+  if seq_len is None:
+    seq_len = gin.query_parameter('%max_seq_len')
+  if seq_len == 0:
+    continuous = True
+    seq_len = gin.query_parameter('%max_seq_len')
+  else:
+    continuous = False
 
   while True:
     try:
@@ -41,11 +53,15 @@ def generate(_):
     except (EOFError, KeyboardInterrupt):
       print()
       break
-    out_text = model.generate(prompt,
-                              seq_len=gin.query_parameter('%max_seq_len'),
-                              temperature=FLAGS.temperature)
-    print(out_text)
-
+    try:
+      for out_text in model.generate(
+          prompt, seq_len=seq_len, temperature=FLAGS.temperature,
+          continuous=continuous):
+        print(out_text, end='')
+      print()
+    except (EOFError, KeyboardInterrupt):
+      print()
+      break
 
 if __name__ == '__main__':
   app.run(generate)
