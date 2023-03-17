@@ -250,6 +250,7 @@ def train():
       checkpoint.save_ckpt(exp_dir, model, optim, step=i,
                            tokens_seen=tokens_seen,
                            tokens_total=tokens_total)
+      checkpoint.save_ckpt(exp_dir, model, optim)  # symlink to latest
 
     if stop_training: break
 
