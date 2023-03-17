@@ -111,7 +111,7 @@ def train():
   iter_train = cycle(dl_train)
 
   ids_valid = next(iter(dl_valid))
-  text_valid = tokenizer.decode_batch(ids_valid)
+  text_valid = tokenizer.decode_batch(ids_valid[:, :-1])
 
   train_steps = gin_get('%train_steps')
   log_steps = gin_get('%log_steps')
@@ -238,7 +238,7 @@ def train():
                                     teacher_forcing=mode)
           writer.add_scalar(f'eval/loss_train_force_{mode}', loss_mode, i)
 
-      text = tokenizer.decode_batch(ids)
+      text = tokenizer.decode_batch(ids[:, :-1])
       log_ex = text_completion_sxs(model, text)
       writer.add_text('example/train', log_ex, i)
 
