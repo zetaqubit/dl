@@ -183,18 +183,22 @@ def train():
     tokens_seen = state.get('tokens_seen', 0)
     tokens_total = state.get('tokens_total', 0)
     end_step += start_step
+    del state
 
   accum_grad_steps = gin_get('%accum_grad_steps', 1)
 
   pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training',
                    mininterval=0.5)
   for i in pbar:
+    avg_loss = 0
     for _ in range(accum_grad_steps):
       ids = next(iter_train)
       loss = model(ids.to('cuda'))
       # loss += model(ids.to('cuda'), teacher_forcing='first_half')
       # loss /= 2
-      (loss / accum_grad_steps).backward()
+      loss /= accum_grad_steps
+      loss.backward()
+      avg_loss += loss.item()
       tokens_seen += (ids.detach() != model.ignore_index).sum().item()
       tokens_total += ids.shape[0] * ids.shape[1]
 
@@ -202,23 +206,23 @@ def train():
     optim.zero_grad()
     lr_scheduler.step()
 
-    pbar.set_description(f'train loss: {loss.item():.2f}')
+    pbar.set_description(f'train loss: {avg_loss:.2f}')
 
 
     stop_training = (i == end_step)
     if stop_training or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
-      writer.add_scalar('loss/train', loss.item(), i)
+      writer.add_scalar('loss/train', avg_loss, i)
       lr = optim.param_groups[0]['lr']
       writer.add_scalar('learning_rate', lr, i)
       writer.add_scalar('step/tokens_seen', tokens_seen, i)
       writer.add_scalar('step/tokens_used_rate', tokens_seen / tokens_total, i)
-      writer.add_scalar('over_tokens/loss_train', loss.item(), tokens_seen)
+      writer.add_scalar('over_tokens/loss_train', avg_loss, tokens_seen)
       writer.flush()
       # if lr <= terminating_lr:
       #   stop_training = True
       #   print(f'Training terminating early at step {i}, '
-      #         f'lr = {lr}, loss = {loss.item()}')
+      #         f'lr = {lr}, loss = {avg_loss}')
 
     if stop_training or (i % eval_interval == 0):
       loss_train = estimate_loss(model, dl_train, eval_steps)
