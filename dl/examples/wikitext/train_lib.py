@@ -99,9 +99,11 @@ def train():
   ds_name = gin_get('%dataset')
   print(f'Loading dataset {ds_name}/{tok_type}.train.bin')
   ds_train = dataset.MemoryMappedDataset(
-      name=ds_name, split=f'{tok_type}.train', block_size=max_seq_len+1)
+      name=ds_name, split=f'{tok_type}.train', block_size=max_seq_len+1,
+      padding_token=tokenizer.padding_id)
   ds_valid = dataset.MemoryMappedDataset(
-      name=ds_name, split=f'{tok_type}.val', block_size=max_seq_len+1)
+      name=ds_name, split=f'{tok_type}.val', block_size=max_seq_len+1,
+      padding_token=tokenizer.padding_id)
 
   batch_size = gin_get('%batch_size')
   dl_train = torch.utils.data.DataLoader(
@@ -248,7 +250,6 @@ def train():
 
       log_ex = text_completion_sxs(model, text_valid)
       writer.add_text('example/eval', log_ex, i)
-
 
     if stop_training or (i % ckpt_steps == 0):
       checkpoint.save_ckpt(exp_dir, model, optim, step=i,
