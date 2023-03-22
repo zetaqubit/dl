@@ -25,6 +25,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from dl.data import tokenizers
+from dl.data import wikitext
 
 flags.DEFINE_string('dataset', None, 'Dataset to download.')
 flags.DEFINE_string('tokenizer', None, 'Type of tokenizer to use.')
@@ -46,8 +47,9 @@ def prepare(dataset, tok_type):
 
   sep_ids = [tokenizer.padding_id]
   if dataset == 'wikitext-103':
-    ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-v1')
-    sep_ids = tokenizer.encode('\n')
+    ds = hf_datasets.load_dataset(path='wikitext', name='wikitext-103-raw-v1')
+    print('Converting to page format.')
+    ds = wikitext.lines_to_pages(ds)
   elif dataset == 'ptb':
     ds = hf_datasets.load_dataset('ptb_text_only')
     ds = ds.rename_column('sentence', 'text')
