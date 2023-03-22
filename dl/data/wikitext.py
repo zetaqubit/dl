@@ -18,6 +18,16 @@ def lines_to_pages(hf_ds):
         continue
       if len(line) == 0:
         continue
+      if line.startswith(' = '):
+        page.append('\n')  # extra newline before headings for readability.
+      # normalize weird @ @ symbols.
+      line = line.replace(' @-@ ', '-')
+      line = line.replace(' @.@ ', '.')
+      line = line.replace(' @,@ ', ',')
+      # make punctuation conventional.
+      line = line.replace(' , ', ', ').replace(' . ', '. ').replace(" '", "'")
+      line = line.replace(' : ', ': ').replace(' ; ', '; ')
+      line = line.replace('( ', '(').replace(' )', ')')
       page.append(line)
     df = pd.DataFrame(pages, columns=['text'])
     ds_out[split] = hf_datasets.Dataset.from_pandas(df, split=split)
