@@ -11,7 +11,7 @@ if [[ $? -ne 0 ]]; then
     exit 1;
 fi
 
-base_dir="/media/14tb/ml/models/zetaqubit/dl/"
+base_dir="/media/14tb/ml/models/zetaqubit/dl/examples/wikitext/"
 
 eval set -- "$VALID_ARGS"
 while [ : ]; do
