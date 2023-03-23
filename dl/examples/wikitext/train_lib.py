@@ -56,10 +56,9 @@ _TEXT_SUMMARY = '''
 '''
 
 @torch.no_grad()
-def text_completion_sxs(model, texts, num=2):
+def text_completion_sxs(model, text, num=2):
   # Example text and generation.
   n_prompt = 16
-  text = texts[0]
   words = text.split(' ')
   if len(words) > 2 * n_prompt:
     prompt, gt = ' '.join(words[:n_prompt]), ' '.join(words[n_prompt:])
@@ -73,6 +72,14 @@ def text_completion_sxs(model, texts, num=2):
   mle = tok.decode_batch(mle_ids)[0]
   log_ex = _TEXT_SUMMARY.format(generated, text, mle)
   return log_ex
+
+
+def decode_ids(tokenizer, ids):
+  mask = ~(ids == tokenizer.padding_id)
+  mask[0] = 1  # keep at least the first token, even if it's padding.
+  ids = ids[mask]  # remove trailing padding
+  text = tokenizer.decode(ids)
+  return text
 
 
 MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
@@ -113,7 +120,7 @@ def train():
   iter_train = cycle(dl_train)
 
   ids_valid = next(iter(dl_valid))
-  text_valid = tokenizer.decode_batch(ids_valid[:, :-1])
+  text_valid = decode_ids(tokenizer, ids_valid[0, :-1])
 
   train_steps = gin_get('%train_steps')
   log_steps = gin_get('%log_steps')
@@ -244,7 +251,7 @@ def train():
                                     teacher_forcing=mode)
           writer.add_scalar(f'eval/loss_train_force_{mode}', loss_mode, i)
 
-      text = tokenizer.decode_batch(ids[:, :-1])
+      text = decode_ids(tokenizer, ids[0, :-1])
       log_ex = text_completion_sxs(model, text)
       writer.add_text('example/train', log_ex, i)
 
