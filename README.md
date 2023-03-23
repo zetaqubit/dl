@@ -1,6 +1,15 @@
 # dl
 Implementations of different Deep Learning architectures and algorithms, using only basic ops provided by pytorch.
 
+# Experiment Results
+
+## transformer
+
+| Model | wikitext-103 ppl | Closest public model |
+| ------- | --------- | ---- |
+| gpt2 12l | [26.7](https://tensorboard.dev/experiment/1J35Jwg0RlSpOwVKgkqL4g/#scalars) | [26.37 (gpt2-medium)](https://paperswithcode.com/sota/language-modelling-on-wikitext-103?metric=Validation%20perplexity)
+
+
 # TODOs
 
 ## transformer
