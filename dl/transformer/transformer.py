@@ -20,6 +20,7 @@ class SelfAttention(nn.Module):
     self.to_q = nn.Linear(dim, dim)
     self.to_k = nn.Linear(dim, dim)
     self.to_v = nn.Linear(dim, dim)
+    self.to_out = nn.Linear(dim, dim)
 
   def forward(self, x):
     """
@@ -42,7 +43,8 @@ class SelfAttention(nn.Module):
     attention = F.softmax(dots, dim=-1)  # b h i j
     summed = einsum('b h i j, b h j d -> b h i d', attention, v)
     concated = rearrange(summed, 'b h i d -> b i (h d)')
-    return concated
+    out = self.to_out(concated)
+    return out
 
 
 @gin.configurable
