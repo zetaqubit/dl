@@ -1,8 +1,10 @@
 """Implementation of the transformer from Attention is All You Need."""
 from typing import Callable
 
-import gin
+from collections import OrderedDict
 from einops import rearrange
+import gin
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
@@ -20,7 +22,7 @@ class SelfAttention(nn.Module):
     self.to_q = nn.Linear(dim, dim)
     self.to_k = nn.Linear(dim, dim)
     self.to_v = nn.Linear(dim, dim)
-    self.to_out = nn.Linear(dim, dim)
+    self.to_out = nn.Linear(dim, dim)  # to_out for special init
 
   def forward(self, x):
     """
@@ -55,11 +57,11 @@ class TransformerBlock(nn.Module):
     self.ln_1 = nn.LayerNorm(dim)
     self.attention = SelfAttention(dim=dim, causal=causal)
     self.ln_2 = nn.LayerNorm(dim)
-    self.ff = nn.Sequential(
-      nn.Linear(dim, dim_internal),
-      nn.GELU(),
-      nn.Linear(dim_internal, dim)
-    )
+    self.ff = nn.Sequential(OrderedDict([
+      ('ff1', nn.Linear(dim, dim_internal)),
+      ('gelu', nn.GELU()),
+      ('to_out', nn.Linear(dim_internal, dim)),  # to_out for special init
+    ]))
 
   def forward(self, x):
     x = x + self.attention(self.ln_1(x))
@@ -127,8 +129,8 @@ class GPT(nn.Module):
     self.apply(self.init_weights_)
     # apply special scaled init to the residual projections, per GPT-2 paper
     for pn, p in self.named_parameters():
-      if pn.endswith('c_proj.weight'):
-        torch.nn.init.normal_(p, mean=0.0, std=0.02/torch.sqrt(2 * n_layers))
+      if pn.endswith('to_out.weight'):
+        torch.nn.init.normal_(p, mean=0.0, std=0.02/np.sqrt(2 * n_layers))
 
   def forward(self, ids):
     x = self.wte(ids) + self.wpe(ids)
