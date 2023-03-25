@@ -82,6 +82,23 @@ def decode_ids(tokenizer, ids):
   return text
 
 
+def gradient_stats(model):
+  l2_norm = 0
+  zero_frac = 0
+  total_params = 0
+  for param in model.parameters():
+    param_norm = param.grad.data.norm(2)
+    l2_norm += param_norm.item() ** 2
+    zero_frac += (param.grad == 0).sum().item()
+    total_params += param.grad.numel()
+  l2_norm = l2_norm ** (1. / 2)
+  zero_frac /= total_params
+  return {
+    'l2_norm': l2_norm,
+    'zero_frac': zero_frac,
+  }
+
+
 MODEL_DIR = '/media/14tb/ml/models/zetaqubit/dl/examples/wikitext'
 
 
@@ -195,6 +212,9 @@ def train():
     del state
 
   accum_grad_steps = gin_get('%accum_grad_steps', 1)
+  record_gradients = gin_get('%record_gradients', True)
+  max_grad_norm = 0
+  batches_skipped = 0
 
   pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training',
                    mininterval=0.5)
@@ -210,6 +230,19 @@ def train():
       avg_loss += loss.item()
       tokens_seen += (ids.detach() != model.ignore_index).sum().item()
       tokens_total += ids.shape[0] * ids.shape[1]
+
+    if record_gradients:
+      grad_stats = gradient_stats(model)
+      for name, stat in grad_stats.items():
+        writer.add_scalar(f'grad/{name}', stat, i)
+      writer.add_scalar('grad/batches_skipped', batches_skipped, i)
+
+      grad_norm = grad_stats['l2_norm']
+      if max_grad_norm and grad_norm > 5 * max_grad_norm:
+        batches_skipped += 1
+        optim.zero_grad()
+        continue
+      max_grad_norm = max(max_grad_norm, grad_norm)
 
     optim.step()
     optim.zero_grad()
