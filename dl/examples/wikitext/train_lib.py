@@ -231,28 +231,10 @@ def train():
       tokens_seen += (ids.detach() != model.ignore_index).sum().item()
       tokens_total += ids.shape[0] * ids.shape[1]
 
-    if record_gradients:
-      grad_stats = gradient_stats(model)
-      for name, stat in grad_stats.items():
-        writer.add_scalar(f'grad/{name}', stat, i)
-      writer.add_scalar('grad/batches_skipped', batches_skipped, i)
-
-      grad_norm = grad_stats['l2_norm']
-      if max_grad_norm and grad_norm > 5 * max_grad_norm:
-        batches_skipped += 1
-        optim.zero_grad()
-        continue
-      max_grad_norm = max(max_grad_norm, grad_norm)
-
-    optim.step()
-    optim.zero_grad()
-    lr_scheduler.step()
-
     pbar.set_description(f'train loss: {avg_loss:.2f}')
 
-
     stop_training = (i == end_step)
-    if stop_training or (i % log_steps == 0):
+    if stop_training or record_gradients or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
       writer.add_scalar('loss/train', avg_loss, i)
       lr = optim.param_groups[0]['lr']
@@ -265,6 +247,26 @@ def train():
       #   stop_training = True
       #   print(f'Training terminating early at step {i}, '
       #         f'lr = {lr}, loss = {avg_loss}')
+
+    if record_gradients:
+      grad_stats = gradient_stats(model)
+      for name, stat in grad_stats.items():
+        writer.add_scalar(f'grad/{name}', stat, i)
+      writer.add_scalar('grad/batches_skipped', batches_skipped, i)
+
+      grad_norm = grad_stats['l2_norm']
+      if max_grad_norm and grad_norm > 5 * max_grad_norm:
+        batches_skipped += 1
+        lr_scheduler.step()
+        optim.zero_grad()
+        continue
+      max_grad_norm = max(max_grad_norm, grad_norm)
+
+    optim.step()
+    optim.zero_grad()
+    lr_scheduler.step()
+
+
 
     if stop_training or (i % eval_interval == 0):
       loss_train = estimate_loss(model, dl_train, eval_steps)
