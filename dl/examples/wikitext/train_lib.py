@@ -24,6 +24,7 @@ from dl.examples.wikitext import checkpoint
 from dl.models import models
 from dl.rnn import rnn
 from dl.utils.config_utils import gin_get
+from dl.utils import running_stats
 
 
 def cycle(loader):
@@ -213,7 +214,7 @@ def train():
 
   accum_grad_steps = gin_get('%accum_grad_steps', 1)
   record_gradients = gin_get('%record_gradients', True)
-  max_grad_norm = 0
+  grad_norm_stats = running_stats.RunningStats()
   batches_skipped = 0
 
   pbar = tqdm.tqdm(range(start_step, end_step + 1), desc='training',
@@ -255,12 +256,19 @@ def train():
       writer.add_scalar('grad/batches_skipped', batches_skipped, i)
 
       grad_norm = grad_stats['l2_norm']
-      if max_grad_norm and grad_norm > 5 * max_grad_norm:
-        batches_skipped += 1
-        lr_scheduler.step()
-        optim.zero_grad()
-        continue
-      max_grad_norm = max(max_grad_norm, grad_norm)
+      if grad_norm_stats.n > 10:
+        grad_mean = grad_norm_stats.mean()
+        grad_stddev = grad_norm_stats.stddev()
+        ci_upper = grad_mean + 2 * grad_stddev
+        writer.add_scalar('grad/l2_norm_mean', grad_mean, i)
+        writer.add_scalar('grad/l2_norm_stddev', grad_stddev, i)
+        writer.add_scalar('grad/l2_norm_ci_upper', ci_upper, i)
+        if grad_norm > ci_upper:
+          batches_skipped += 1
+          lr_scheduler.step()
+          optim.zero_grad()
+          continue
+      grad_norm_stats.push(grad_norm)
 
     optim.step()
     optim.zero_grad()
