@@ -12,10 +12,11 @@ DATA_ROOT = '/home/z/data/zetaqubit/dl/data'
 @gin.configurable
 class MemoryMappedDataset(torch.utils.data.Dataset):
   def __init__(self, name, split, block_size, dbg_num_blocks=None,
-               padding_token=None):
+               padding_token=None, min_nonpadding_tokens=64):
     path = f'{DATA_ROOT}/{name}/{split}.bin'
     self.data = np.memmap(path, dtype=np.uint16, mode='r')
     self.block_size = block_size
+    self.min_nonpadding_tokens = min(min_nonpadding_tokens, block_size)
     self.dataset_size = len(self.data)
     self.padding_token = padding_token
     if dbg_num_blocks is not None:
@@ -27,12 +28,24 @@ class MemoryMappedDataset(torch.utils.data.Dataset):
 
   def __getitem__(self, _):
     # Break contract and return a random span.
-    ix = torch.randint(self.dataset_size - self.block_size, (1,))
-    x = self.data[ix:ix+self.block_size]
+    def random_span():
+      ix = torch.randint(self.dataset_size - self.block_size, (1,))
+      x = self.data[ix:ix+self.block_size]
+      return x
+    x = random_span()
 
     # Mark as padding all tokens to the right of the first padding token.
     if self.padding_token is not None:
       padding_mask = x == self.padding_token
+
+      # Attempt to get a sequence with enough non-padding tokens.
+      attempt = 0
+      while ((idx := np.argmax(padding_mask)) != 0 and
+             idx < self.min_nonpadding_tokens and attempt < 5):
+        x = random_span()
+        padding_mask = x == self.padding_token
+        attempt += 1
+
       padding_mask = np.clip(np.cumsum(padding_mask), 0, 1)
       x = np.where(padding_mask, self.padding_token, x)
 
