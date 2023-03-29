@@ -234,6 +234,7 @@ def train():
 
     pbar.set_description(f'train loss: {avg_loss:.2f}')
 
+
     stop_training = (i == end_step)
     if stop_training or record_gradients or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
@@ -256,6 +257,7 @@ def train():
       writer.add_scalar('grad/batches_skipped', batches_skipped, i)
 
       grad_norm = grad_stats['l2_norm']
+      grad_norm_stats.push(grad_norm)
       if grad_norm_stats.n > 10:
         grad_mean = grad_norm_stats.mean()
         grad_stddev = grad_norm_stats.stddev()
@@ -263,12 +265,14 @@ def train():
         writer.add_scalar('grad/l2_norm_mean', grad_mean, i)
         writer.add_scalar('grad/l2_norm_stddev', grad_stddev, i)
         writer.add_scalar('grad/l2_norm_ci_upper', ci_upper, i)
-        if grad_norm > ci_upper:
-          batches_skipped += 1
-          lr_scheduler.step()
-          optim.zero_grad()
-          continue
-      grad_norm_stats.push(grad_norm)
+        # if grad_norm > ci_upper:
+        #   batches_skipped += 1
+        #   lr_scheduler.step()
+        #   optim.zero_grad()
+        #   continue
+
+      torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+
 
     optim.step()
     optim.zero_grad()
