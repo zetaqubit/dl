@@ -271,8 +271,7 @@ def train():
         #   optim.zero_grad()
         #   continue
 
-      torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
 
     optim.step()
     optim.zero_grad()
