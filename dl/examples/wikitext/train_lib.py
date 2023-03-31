@@ -69,7 +69,8 @@ def text_completion_sxs(model, text, num=2):
   tok = model.tokenizer
   in_ids = torch.tensor(tok.encode(text)).to('cuda')
   in_ids = rearrange(in_ids, 's -> 1 s')
-  mle_ids = torch.argmax(model.net(in_ids), dim=-1)
+  logits = model.net(in_ids)
+  mle_ids = torch.argmax(logits, dim=-1)
   mle = tok.decode_batch(mle_ids)[0]
   log_ex = _TEXT_SUMMARY.format(generated, text, mle)
   return log_ex
