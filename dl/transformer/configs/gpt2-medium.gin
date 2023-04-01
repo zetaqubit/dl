@@ -2,15 +2,15 @@ include 'dl/transformer/configs/autoregressive.gin'
 
 model_name = 'gpt2-medium'
 
-accum_grad_steps = 1
-batch_size = 16
-max_seq_len = 128
+accum_grad_steps = 8
+batch_size = 8
+max_seq_len = 512
 learning_rate = 2e-5
 train_steps = 100_000
 log_steps = 100
 eval_interval = 1000
 eval_steps = 5
-ckpt_steps = 20_000
+ckpt_steps = 10_000
 
 GPT.n_layers = 24
 GPT.dim = 1024
