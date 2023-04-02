@@ -16,6 +16,7 @@ Implementations of different Deep Learning architectures and algorithms, using o
 
 - [x] Implement transformer with self-attention
 - [ ] Implement relative position embeddings
+- [ ] Implement RoPE embeddings
 - [ ] Add support for cross-attention, as used in NMT
 
 ## rnn
