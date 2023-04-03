@@ -14,6 +14,7 @@ import gin
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from torch.utils import tensorboard as tb
 import torchinfo
 import tqdm
@@ -37,10 +38,28 @@ def cycle(loader):
 def estimate_loss(model, data_loader, steps, **kwargs):
   model.eval()
   losses = torch.zeros(steps)
+  losses_t = torch.zeros(steps, gin_get('%max_seq_len'))
   for i, ids in zip(range(steps), data_loader):
-    losses[i] = model(ids.to('cuda'), **kwargs).item()
+    ids = ids.to('cuda')
+    losses[i] = model(ids, **kwargs).item()
+    losses_t[i, :] = estimate_loss_timesteps(model, ids)
   model.train()
-  return losses.mean()
+  return {
+    'loss': losses.mean(),
+    'loss_t': losses_t.mean(axis=0),
+  }
+
+
+@torch.no_grad()
+def estimate_loss_timesteps(model, ids):
+  inputs, targets = ids[:, :-1], ids[:, 1:]
+  logits = model.net(inputs)
+  logits = rearrange(logits, 'b s v -> b v s')  # CE expects this order
+  loss_t = F.cross_entropy(logits, targets, ignore_index=model.ignore_index,
+                            reduction='none')
+  loss_t = loss_t.mean(axis=0)  # [s]
+  return loss_t
+
 
 def filter_example(example):
   text = example['text']
@@ -175,7 +194,24 @@ def train():
   #   optim, mode='min', factor=0.3, patience=300, cooldown=100,
   #   min_lr=min_lr)
 
+  seq_pos_evaled = (1, 16, 32, 64, 128, 512, 1024)
+
   writer = tb.SummaryWriter(exp_dir)
+  layout = {
+    'eval': {
+        'loss': ['Multiline', ['eval/loss_train', 'eval/loss_valid']],
+    },
+    'seq_pos': {
+        'loss_train': [
+            'Multiline', [f'seq_pos_train/loss_{pos}' for pos in seq_pos_evaled]
+        ],
+        'loss_valid': [
+            'Multiline', [f'seq_pos_valid/loss_{pos}' for pos in seq_pos_evaled]
+        ],
+    },
+  }
+  writer.add_custom_scalars(layout)
+
   writer.add_text('model/gin_config', gin.markdown(gin.config_str()), 0)
   model_summary = torchinfo.summary(model, input_data=ids_valid)
   model_summary = '\n'.join([f'    {s}' for s in str(model_summary).split('\n')])
@@ -278,11 +314,10 @@ def train():
     optim.zero_grad()
     lr_scheduler.step()
 
-
-
     if stop_training or (i % eval_interval == 0):
-      loss_train = estimate_loss(model, dl_train, eval_steps)
-      loss_valid = estimate_loss(model, dl_valid, eval_steps)
+      train_d = estimate_loss(model, dl_train, eval_steps)
+      valid_d = estimate_loss(model, dl_valid, eval_steps)
+      loss_train, loss_valid = train_d['loss'], valid_d['loss']
       writer.add_scalar('eval/loss_train', loss_train, i)
       writer.add_scalar('eval/loss_valid', loss_valid, i)
       writer.add_scalar('eval/perplexity_valid', loss_valid.exp(), i)
@@ -291,12 +326,19 @@ def train():
       writer.add_scalar('over_tokens/loss_eval_train', loss_train, tokens_seen)
       writer.add_scalar('over_tokens/loss_eval_valid', loss_valid, tokens_seen)
 
+      loss_train_t, loss_valid_t = train_d['loss_t'], valid_d['loss_t']
+      for pos in seq_pos_evaled:
+        if pos > loss_train_t.shape[0]:
+          break
+        writer.add_scalar(f'seq_pos_train/loss_{pos}', loss_train_t[pos-1], i)
+        writer.add_scalar(f'seq_pos_valid/loss_{pos}', loss_valid_t[pos-1], i)
+
       if isinstance(model, rnn.GenerativeRnnModel):
         teacher_forcing = ['all', 'first_half']
         for mode in teacher_forcing:
           loss_mode = estimate_loss(model, dl_train, eval_steps,
                                     teacher_forcing=mode)
-          writer.add_scalar(f'eval/loss_train_force_{mode}', loss_mode, i)
+          writer.add_scalar(f'rnn/loss_train_force_{mode}', loss_mode, i)
 
       text = decode_ids(tokenizer, ids[0, :-1])
       log_ex = text_completion_sxs(model, text)
