@@ -250,7 +250,7 @@ def train():
     del state
 
   accum_grad_steps = gin_get('%accum_grad_steps', 1)
-  record_gradients = gin_get('%record_gradients', True)
+  debug_gradients = gin_get('%debug_gradients', False)
   grad_norm_stats = running_stats.RunningStats()
   batches_skipped = 0
 
@@ -273,7 +273,7 @@ def train():
 
 
     stop_training = (i == end_step)
-    if stop_training or record_gradients or (i % log_steps == 0):
+    if stop_training or debug_gradients or (i % log_steps == 0):
       writer.add_scalar('step', i, i)
       writer.add_scalar('loss/train', avg_loss, i)
       lr = optim.param_groups[0]['lr']
@@ -287,7 +287,6 @@ def train():
       #   print(f'Training terminating early at step {i}, '
       #         f'lr = {lr}, loss = {avg_loss}')
 
-    if record_gradients:
       grad_stats = gradient_stats(model)
       for name, stat in grad_stats.items():
         writer.add_scalar(f'grad/{name}', stat, i)
