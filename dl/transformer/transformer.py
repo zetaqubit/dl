@@ -114,6 +114,24 @@ class AbsolutePositionalEmbedding(nn.Module):
 
 
 @gin.configurable
+class RelativePositionalEmbedding(nn.Module):
+  def __init__(self, dim: int, max_rel_pos: int):
+    super().__init__()
+    self.max_rel_pos = max_rel_pos
+    self.emb = nn.Embedding(2 * max_rel_pos + 1, dim)
+    self.scale = dim ** -0.5
+
+  def forward(self, x):  # [b, s]  ->  [b, s, e]
+    seq_len, device = x.shape[1], x.device
+    pos = torch.arange(seq_len, device=device)  # [s]
+    rel_pos = pos[None, :] - pos[:, None]  # [s, s]. Represents pos_q - pos_k.
+    rel_pos.clamp_(-self.max_rel_pos, self.max_rel_pos)
+    rel_pos += self.max_rel_pos  # convert to range [0, 2 * max_rel_pos]
+    pos_emb = self.emb(rel_pos) * self.scale
+    return pos_emb
+
+
+@gin.configurable
 class GPT(nn.Module):
   def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
     super().__init__()
