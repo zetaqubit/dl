@@ -194,7 +194,7 @@ def train():
   #   optim, mode='min', factor=0.3, patience=300, cooldown=100,
   #   min_lr=min_lr)
 
-  seq_pos_evaled = (1, 16, 32, 64, 128, 512, 1024)
+  seq_pos_evaled = (1, 16, 32, 64, 128, 256, 512, 1024)
 
   writer = tb.SummaryWriter(exp_dir)
   layout = {
