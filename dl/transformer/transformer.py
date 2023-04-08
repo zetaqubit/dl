@@ -121,24 +121,25 @@ class RelativePositionalEmbedding(nn.Module):
     self.emb = nn.Embedding(2 * max_rel_pos + 1, dim)
     self.scale = dim ** -0.5
 
-  def forward(self, x):  # [b, s]  ->  [b, s, e]
+  def forward(self, x):  # [b, s]  ->  [s, s, e]
     seq_len, device = x.shape[1], x.device
     pos = torch.arange(seq_len, device=device)  # [s]
     rel_pos = pos[None, :] - pos[:, None]  # [s, s]. Represents pos_q - pos_k.
     rel_pos.clamp_(-self.max_rel_pos, self.max_rel_pos)
     rel_pos += self.max_rel_pos  # convert to range [0, 2 * max_rel_pos]
-    pos_emb = self.emb(rel_pos) * self.scale
+    pos_emb = self.emb(rel_pos) * self.scale  # [s, s, e]
     return pos_emb
 
 
 @gin.configurable
 class GPT(nn.Module):
-  def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int):
+  def __init__(self, n_layers: int, dim: int, max_seq_len: int, vocab: int,
+               pos_emb_fn: Callable[[], nn.Module]):
     super().__init__()
     self.max_seq_len = max_seq_len
     self.vocab = vocab
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
-    self.wpe = AbsolutePositionalEmbedding(dim, max_seq_len)
+    self.wpe = pos_emb_fn(dim=dim)
     self.transformers = Decoder(n_layers, dim)
     self.lm_head = nn.Linear(dim, vocab, bias=False)
     self.lm_head.weight = self.wte.weight  # tie embedding weight
@@ -151,7 +152,9 @@ class GPT(nn.Module):
         torch.nn.init.normal_(p, mean=0.0, std=0.02/np.sqrt(2 * n_layers))
 
   def forward(self, ids):
-    x = self.wte(ids) + self.wpe(ids)
+    x = self.wte(ids)
+    if isinstance(self.wpe, AbsolutePositionalEmbedding):
+      x = x + self.wpe(ids)
     x = self.transformers(x)
     x = self.lm_head(x)
     return x
