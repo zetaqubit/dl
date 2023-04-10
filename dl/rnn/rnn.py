@@ -37,6 +37,7 @@ class RNN(nn.Module):
   def __init__(self, n_layers, hidden_size, activation_ho):
     super().__init__()
     self.n_layers = n_layers
+    self.hidden_size = hidden_size
     self.rnn_cells = nn.ModuleList([RNNCell() for _ in range(n_layers)])
     self.who = nn.Linear(hidden_size, hidden_size)
     self.activation_ho = activation_ho
@@ -64,6 +65,15 @@ class RNN(nn.Module):
     if self.activation_ho:
       out = self.activation_ho(out)
     return out, torch.stack(hs_outs, dim=1)
+
+  def initial_state(self, x_shape):
+    b = x_shape[0] if len(x_shape) > 1 else 1
+    hs = torch.zeros((b, self.n_layers, self.hidden_size), device=self.device)
+    return hs
+
+  @property
+  def device(self):
+      return next(self.parameters()).device
 
 
 @gin.configurable
@@ -93,7 +103,7 @@ class RnnLM(nn.Module):
         (seq_len,), teacher_force_mask, device=ids.device)
     assert len(teacher_force_mask) == seq_len
     xs = self.wte(ids)  # [b, seq_len, dim]
-    hs = torch.zeros((b, self.n_layers, self.dim), device=ids.device)
+    hs = self.rnn.initial_state(xs.shape)
     logits_seq = [None] * seq_len
     x = xs[:, 0, :]
     for t in range(seq_len):
@@ -175,7 +185,7 @@ class GenerativeRnnModel(nn.Module):
 
     # Run RNN through the prompt.
     xs = self.net.wte(ids)  # [b, prompt_len, dim]
-    hs = torch.zeros((b, self.net.n_layers, self.net.dim), device=ids.device)
+    hs = self.net.rnn.initial_state(xs.shape)
     for t in range(prompt_len - 1):
       _, hs = self.net.rnn(xs[:, t, :], hs)
 

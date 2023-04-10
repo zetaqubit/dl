@@ -335,8 +335,9 @@ def train():
       if isinstance(model, rnn.GenerativeRnnModel):
         teacher_forcing = ['all', 'first_half']
         for mode in teacher_forcing:
-          loss_mode = estimate_loss(model, dl_train, eval_steps,
-                                    teacher_forcing=mode)
+          train_d = estimate_loss(model, dl_train, eval_steps,
+                                  teacher_forcing=mode)
+          loss_mode = train_d['loss']
           writer.add_scalar(f'rnn/loss_train_force_{mode}', loss_mode, i)
 
       text = decode_ids(tokenizer, ids[0, :-1])
