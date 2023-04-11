@@ -1,0 +1,3 @@
+RNNCell.activation_hh = @torch.tanh
+RNN.activation_ho = None
+RnnLM.rnn = @RNN

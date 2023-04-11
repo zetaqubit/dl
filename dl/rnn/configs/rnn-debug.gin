@@ -1,4 +1,5 @@
 include "dl/rnn/configs/generative_rnn.gin"
+include "dl/rnn/configs/rnn.gin"
 
 model_name = 'rnn-debug'
 
@@ -12,11 +13,6 @@ eval_steps = 1
 ckpt_steps = 100
 
 dim = 6
-
-RNNCell.hidden_size = %dim
-RNNCell.activation_hh = @torch.tanh
-
-RNN.activation_ho = None
 
 RnnLM.n_layers = 1
 RnnLM.dim = %dim

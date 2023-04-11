@@ -38,7 +38,8 @@ class RNN(nn.Module):
     super().__init__()
     self.n_layers = n_layers
     self.hidden_size = hidden_size
-    self.rnn_cells = nn.ModuleList([RNNCell() for _ in range(n_layers)])
+    self.cells = nn.ModuleList([RNNCell(hidden_size=hidden_size)
+                                for _ in range(n_layers)])
     self.who = nn.Linear(hidden_size, hidden_size)
     self.activation_ho = activation_ho
 
@@ -57,8 +58,8 @@ class RNN(nn.Module):
     assert n == self.n_layers
     assert hidden_size == x_hidden
 
-    hs_outs = [None] * len(self.rnn_cells)
-    for i, cell in enumerate(self.rnn_cells):
+    hs_outs = [None] * len(self.cells)
+    for i, cell in enumerate(self.cells):
       hs_outs[i] = cell(x, hs[:, i, :])
       x = hs_outs[i]
     out = self.who(hs_outs[-1])
@@ -73,18 +74,99 @@ class RNN(nn.Module):
 
   @property
   def device(self):
-      return next(self.parameters()).device
+    return next(self.parameters()).device
+
+
+@gin.configurable
+class LSTMCell(nn.Module):
+  def __init__(self, hidden_size, activation_g, activation_c,
+               activation_h):
+    super().__init__()
+    self.forget_w = nn.Linear(2 * hidden_size, hidden_size)
+    self.input_w = nn.Linear(2 * hidden_size, hidden_size)
+    self.output_w = nn.Linear(2 * hidden_size, hidden_size)
+    self.hidden_w = nn.Linear(2 * hidden_size, hidden_size)
+    self.activation_g = activation_g
+    self.activation_c = activation_c
+    self.activation_h = activation_h
+
+  def forward(self, x, h, c):
+    """
+    Args:
+      x: [batch, hidden_size]
+      h: [batch, hidden_size]
+    """
+    xh = torch.cat((x, h), axis=1)
+    f_t = self.activation_g(self.forget_w(xh))
+    i_t = self.activation_g(self.input_w(xh))
+    o_t = self.activation_g(self.output_w(xh))
+    c_t_tilde = self.activation_c(self.hidden_w(xh))
+    c_t = f_t * c + i_t * c_t_tilde
+    h_t = o_t * self.activation_h(c_t)
+    return h_t, c_t
+
+
+@gin.configurable
+class LSTM(nn.Module):
+  def __init__(self, n_layers, hidden_size, activation_ho):
+    super().__init__()
+    self.n_layers = n_layers
+    self.hidden_size = hidden_size
+    self.cells = nn.ModuleList([LSTMCell(hidden_size=hidden_size)
+                                for _ in range(n_layers)])
+    self.who = nn.Linear(hidden_size, hidden_size)
+    self.activation_ho = activation_ho
+
+  def forward(self, x, hiddens):
+    """Runs RNN forward by 1 timestep.
+    Args:
+      x: [batch, hidden_size]
+      hs: [batch, n_layers, hidden_size]
+    Outputs:
+      x: output of the top layer. [batch, hidden_size]
+      hs_t: new hidden states. [batch, n_layers, hidden_size]
+    """
+    hs, cs = hiddens
+    x_b, x_hidden = x.shape
+    b, n, hidden_size = hs.shape
+    assert b == x_b
+    assert n == self.n_layers
+    assert hidden_size == x_hidden
+    assert hs.shape == cs.shape
+
+    hs_outs = [None] * len(self.cells)
+    cs_outs = [None] * len(self.cells)
+    for i, cell in enumerate(self.cells):
+      hs_outs[i], cs_outs[i] = cell(x, hs[:, i, :], cs[:, i, :])
+      x = hs_outs[i]
+    out = self.who(hs_outs[-1])
+    if self.activation_ho:
+      out = self.activation_ho(out)
+    hs_t = torch.stack(hs_outs, dim=1)
+    cs_t = torch.stack(cs_outs, dim=1)
+    return out, (hs_t, cs_t)
+
+  def initial_state(self, x_shape):
+    b = x_shape[0] if len(x_shape) > 1 else 1
+    hs = torch.zeros((b, self.n_layers, self.hidden_size), device=self.device)
+    cs = torch.zeros((b, self.n_layers, self.hidden_size), device=self.device)
+    return hs, cs
+
+  @property
+  def device(self):
+    return next(self.parameters()).device
 
 
 @gin.configurable
 class RnnLM(nn.Module):
   """Language model backed by a RNN."""
-  def __init__(self, n_layers: int, dim: int, vocab: int):
+  def __init__(self, n_layers: int, dim: int, vocab: int,
+               rnn: Callable[[], nn.Module]):
     super().__init__()
     self.n_layers = n_layers
     self.dim = dim
     self.vocab = vocab
-    self.rnn = RNN(n_layers=n_layers, hidden_size=dim)
+    self.rnn = rnn(n_layers=n_layers, hidden_size=dim)
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
     self.lm_head = nn.Linear(dim, vocab, bias=False)
     self.lm_head.weight = self.wte.weight  # tie embedding weight

@@ -1,4 +1,5 @@
 include "dl/rnn/configs/generative_rnn.gin"
+include "dl/rnn/configs/rnn.gin"
 
 model_name = 'rnn-medium'
 
@@ -12,11 +13,6 @@ eval_steps = 2
 ckpt_steps = 1000
 
 dim = 512
-
-RNNCell.hidden_size = %dim
-RNNCell.activation_hh = @torch.tanh
-
-RNN.activation_ho = None
 
 RnnLM.n_layers = 8
 RnnLM.dim = %dim

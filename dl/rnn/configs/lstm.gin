@@ -1,0 +1,7 @@
+LSTMCell.activation_g = @torch.sigmoid
+LSTMCell.activation_c = @torch.tanh
+LSTMCell.activation_h = @torch.tanh
+
+LSTM.activation_ho = None
+
+RnnLM.rnn = @LSTM
