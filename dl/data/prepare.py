@@ -9,6 +9,10 @@ Supported datasets:
   - openwebtext
   - ptb: Penn Treebank
 
+Toy datasets:
+  - abc: the alphabet in lowercase and uppercase, repeated infinitely
+  - abc-r#: same as abc, but with each letter repeated # times in a row
+
 
 Supported tokenizers:
   - char: ASCII character tokenizer (ignores non-ASCII)
@@ -16,6 +20,7 @@ Supported tokenizers:
 '''
 
 import os
+import re
 
 from absl import app
 from absl import flags
@@ -59,8 +64,11 @@ def prepare(dataset, tok_type):
     ds = hf_datasets.Dataset.from_pandas(df, split='train')
     ds = hf_datasets.DatasetDict({'train': ds})
     sep_ids = tokenizer.encode('\n')
-  elif dataset == 'abc':
+  elif dataset.startswith('abc'):
+    match = re.search(r'\d+', dataset)
+    repeat = int(match.group()) if match else 1
     abc = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    abc = ''.join(c * repeat for c in abc)
     ds = hf_datasets.DatasetDict({
       'train': hf_datasets.Dataset.from_dict({'text': [abc] * 1000}),
     })
@@ -71,7 +79,7 @@ def prepare(dataset, tok_type):
   if dataset in ('wikitext-103', 'ptb'):
     # These datasets have a validation split, so just rename it.
     ds['val'] = ds.pop('validation')  # rename
-  elif dataset in ('abc', 'shakespeare', 'enwik8'):
+  elif dataset in ('shakespeare', 'enwik8') or dataset.startswith('abc'):
     # These datasets don't have a validation split, so create it ourselves.
     ds = ds['train'].train_test_split(test_size=0.05, seed=2357, shuffle=True)
     ds['val'] = ds.pop('test')  # rename
