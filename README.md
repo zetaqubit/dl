@@ -9,6 +9,9 @@ Implementations of different Deep Learning architectures and algorithms, using o
 | ------- | --------- | ---- |
 | gpt2 12l | [26.7](https://tensorboard.dev/experiment/1J35Jwg0RlSpOwVKgkqL4g/#scalars) | [26.37 (gpt2-medium)](https://paperswithcode.com/sota/language-modelling-on-wikitext-103?metric=Validation%20perplexity)
 
+## toy datasets
+
+* RNN vs LSTM vs GRU on toy dataset of "abcdef...": [tensorboard](https://tensorboard.dev/experiment/7iXNkEoKSNegP4D2Sdenpw/#scalars)
 
 # TODOs
 
