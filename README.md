@@ -12,6 +12,8 @@ Implementations of different Deep Learning architectures and algorithms, using o
 ## toy datasets
 
 * RNN vs LSTM vs GRU on toy dataset of "abcdef...": [tensorboard](https://tensorboard.dev/experiment/7iXNkEoKSNegP4D2Sdenpw/#scalars)
+* RNN vs LSTM vs GRU on toy dataset of "a...ab..bc..c...": [tensorboard](https://tensorboard.dev/experiment/jy94YBDhQ5G82msYznREVA/#scalars)
+
 
 # TODOs
 
