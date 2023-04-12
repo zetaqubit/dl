@@ -33,12 +33,35 @@ class RNNCell(nn.Module):
 
 
 @gin.configurable
+class GRUCell(nn.Module):
+  def __init__(self, hidden_size):
+    super().__init__()
+    self.wz = nn.Linear(2 * hidden_size, hidden_size)
+    self.wr = nn.Linear(2 * hidden_size, hidden_size)
+    self.wh = nn.Linear(2 * hidden_size, hidden_size)
+
+  def forward(self, x, h):
+    """
+    Args:
+      x: [batch, hidden_size]
+      h: [batch, hidden_size]
+    """
+    hx = torch.cat((h, x), axis=1)
+    z = F.sigmoid(self.wz(hx))
+    r = F.sigmoid(self.wr(hx))
+    h_tilde = torch.cat((r * h, x), axis=1)
+    h_tilde = F.tanh(self.wh(h_tilde))
+    h_t = (1 - z) * h + z * h_tilde
+    return h_t
+
+
+@gin.configurable
 class RNN(nn.Module):
-  def __init__(self, n_layers, hidden_size, activation_ho):
+  def __init__(self, n_layers, hidden_size, activation_ho, cell_fn):
     super().__init__()
     self.n_layers = n_layers
     self.hidden_size = hidden_size
-    self.cells = nn.ModuleList([RNNCell(hidden_size=hidden_size)
+    self.cells = nn.ModuleList([cell_fn(hidden_size=hidden_size)
                                 for _ in range(n_layers)])
     self.who = nn.Linear(hidden_size, hidden_size)
     self.activation_ho = activation_ho

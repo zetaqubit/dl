@@ -22,7 +22,8 @@ Implementations of different Deep Learning architectures and algorithms, using o
 ## rnn
 
 - [x] Implement RNN
-- [ ] Implement LSTM
+- [x] Implement LSTM
+- [x] Implement GRU
 - [ ] Implement RWKV
 
 ## examples/wikitext

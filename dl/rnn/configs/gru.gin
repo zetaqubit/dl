@@ -1,0 +1,4 @@
+RnnLM.rnn = @RNN
+
+RNN.cell_fn = @GRUCell
+RNN.activation_ho = None
