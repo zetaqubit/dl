@@ -3,7 +3,7 @@ include "dl/rnn/configs/rnn.gin"
 
 model_name = 'rnn-medium'
 
-batch_size = 32
+batch_size = 128
 max_seq_len = 128
 learning_rate = 1e-4
 train_steps = 10_000
