@@ -1,0 +1,2 @@
+GPT.pos_emb_fn = @SinusoidalPositionalEmbedding
+SinusoidalPositionalEmbedding.max_seq_len = %max_seq_len

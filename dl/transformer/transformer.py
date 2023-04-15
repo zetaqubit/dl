@@ -1,4 +1,5 @@
 """Implementation of the transformer from Attention is All You Need."""
+import math
 from typing import Callable
 
 from collections import OrderedDict
@@ -114,6 +115,25 @@ class AbsolutePositionalEmbedding(nn.Module):
 
 
 @gin.configurable
+class SinusoidalPositionalEmbedding(nn.Module):
+  def __init__(self, dim: int, max_seq_len: int):
+    super().__init__()
+    self.max_seq_len = max_seq_len
+    pos = torch.arange(0, max_seq_len)[:, None]
+    div = torch.arange(0, dim, 2) * math.log(10000) / dim
+    div = torch.exp(-div)
+    self.register_buffer('emb', torch.zeros((max_seq_len, dim)))
+    self.emb[: , 0::2] = torch.sin(pos * div)
+    self.emb[: , 1::2] = torch.cos(pos * div)
+
+  def forward(self, x):  # [b, s]  ->  [b, s, e]
+    seq_len = x.shape[1]
+    assert seq_len <= self.max_seq_len, "input length > max_seq_len"
+    pos_emb = self.emb[:seq_len, :]
+    return pos_emb
+
+
+@gin.configurable
 class RelativePositionalEmbedding(nn.Module):
   def __init__(self, dim: int, max_rel_pos: int):
     super().__init__()
@@ -153,7 +173,8 @@ class GPT(nn.Module):
 
   def forward(self, ids):
     x = self.wte(ids)
-    if isinstance(self.wpe, AbsolutePositionalEmbedding):
+    if isinstance(self.wpe,
+                  (AbsolutePositionalEmbedding, SinusoidalPositionalEmbedding)):
       x = x + self.wpe(ids)
     x = self.transformers(x)
     x = self.lm_head(x)
