@@ -44,3 +44,8 @@ Implementations of different Deep Learning architectures and algorithms, using o
 - [ ] Try mixed precision
 - [ ] Scale to 1.5B param model
 - [ ] Scale to 1024 sequence length
+
+## eval
+
+- [ ] Implement evaluation framework
+- [ ] Collect popular LM benchmarks and published metrics
