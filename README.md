@@ -24,6 +24,7 @@ Implementations of different Deep Learning architectures and algorithms, using o
 - [ ] Implement relative position embeddings
 - [ ] Implement RoPE embeddings
 - [ ] Add support for cross-attention, as used in NMT
+- [ ] Implement beam search decoding
 
 ## rnn
 
