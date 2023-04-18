@@ -1,2 +1,2 @@
-GPT.pos_emb_fn = @RelativePositionalEmbedding
-RelativePositionalEmbedding.max_rel_pos = %max_seq_len
+GPT.pos_emb_fn = @RelativePositionEmbedding
+RelativePositionEmbedding.max_rel_pos = %max_seq_len

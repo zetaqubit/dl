@@ -99,7 +99,7 @@ class Decoder(nn.Module):
 
 
 @gin.configurable
-class AbsolutePositionalEmbedding(nn.Module):
+class AbsolutePositionEmbedding(nn.Module):
   def __init__(self, dim: int, max_seq_len: int):
     super().__init__()
     self.max_seq_len = max_seq_len
@@ -115,7 +115,7 @@ class AbsolutePositionalEmbedding(nn.Module):
 
 
 @gin.configurable
-class SinusoidalPositionalEmbedding(nn.Module):
+class SinusoidalPositionEmbedding(nn.Module):
   def __init__(self, dim: int, max_seq_len: int):
     super().__init__()
     self.max_seq_len = max_seq_len
@@ -134,7 +134,7 @@ class SinusoidalPositionalEmbedding(nn.Module):
 
 
 @gin.configurable
-class RelativePositionalEmbedding(nn.Module):
+class RelativePositionEmbedding(nn.Module):
   def __init__(self, dim: int, max_rel_pos: int):
     super().__init__()
     self.max_rel_pos = max_rel_pos
@@ -174,7 +174,7 @@ class GPT(nn.Module):
   def forward(self, ids):
     x = self.wte(ids)
     if isinstance(self.wpe,
-                  (AbsolutePositionalEmbedding, SinusoidalPositionalEmbedding)):
+                  (AbsolutePositionEmbedding, SinusoidalPositionEmbedding)):
       x = x + self.wpe(ids)
     x = self.transformers(x)
     x = self.lm_head(x)
