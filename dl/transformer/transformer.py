@@ -15,11 +15,12 @@ from dl.data import tokenizers
 
 @gin.configurable
 class SelfAttention(nn.Module):
-  def __init__(self, dim: int, heads: int, causal=False):
+  def __init__(self, dim: int, heads: int, causal=False, attn_bias=None):
     super().__init__()
     self.scaling_factor = dim ** -0.5
     self.heads = heads
     self.causal = causal
+    self.attn_bias = attn_bias
     self.to_q = nn.Linear(dim, dim)
     self.to_k = nn.Linear(dim, dim)
     self.to_v = nn.Linear(dim, dim)
@@ -39,6 +40,8 @@ class SelfAttention(nn.Module):
     v = rearrange(v, 'b s (h d) -> b h s d', h=self.heads)
 
     dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scaling_factor
+    if self.attn_bias is not None:
+      dots = dots + self.attn_bias(x)
     if self.causal:
       j = dots.shape[-1]
       mask = torch.ones((j, j), dtype=bool, device=device).triu(diagonal=1)
@@ -134,12 +137,11 @@ class SinusoidalPositionEmbedding(nn.Module):
 
 
 @gin.configurable
-class RelativePositionEmbedding(nn.Module):
-  def __init__(self, dim: int, max_rel_pos: int):
+class RelativePositionBias(nn.Module):
+  def __init__(self, max_rel_pos: int):
     super().__init__()
     self.max_rel_pos = max_rel_pos
-    self.emb = nn.Embedding(2 * max_rel_pos + 1, dim)
-    self.scale = dim ** -0.5
+    self.bias = nn.Parameter(torch.rand(2 * max_rel_pos + 1))
 
   def forward(self, x):  # [b, s]  ->  [s, s, e]
     seq_len, device = x.shape[1], x.device
@@ -147,8 +149,8 @@ class RelativePositionEmbedding(nn.Module):
     rel_pos = pos[None, :] - pos[:, None]  # [s, s]. Represents pos_q - pos_k.
     rel_pos.clamp_(-self.max_rel_pos, self.max_rel_pos)
     rel_pos += self.max_rel_pos  # convert to range [0, 2 * max_rel_pos]
-    pos_emb = self.emb(rel_pos) * self.scale  # [s, s, e]
-    return pos_emb
+    pos_bias = self.bias[rel_pos]  # [s, s]
+    return pos_bias
 
 
 @gin.configurable
@@ -159,7 +161,7 @@ class GPT(nn.Module):
     self.max_seq_len = max_seq_len
     self.vocab = vocab
     self.wte = nn.Embedding(vocab, dim)  # token embeddings
-    self.wpe = pos_emb_fn(dim=dim)
+    self.wpe = pos_emb_fn(dim=dim) if pos_emb_fn is not None else None
     self.transformers = Decoder(n_layers, dim)
     self.lm_head = nn.Linear(dim, vocab, bias=False)
     self.lm_head.weight = self.wte.weight  # tie embedding weight
@@ -173,8 +175,7 @@ class GPT(nn.Module):
 
   def forward(self, ids):
     x = self.wte(ids)
-    if isinstance(self.wpe,
-                  (AbsolutePositionEmbedding, SinusoidalPositionEmbedding)):
+    if self.wpe is not None:
       x = x + self.wpe(ids)
     x = self.transformers(x)
     x = self.lm_head(x)
