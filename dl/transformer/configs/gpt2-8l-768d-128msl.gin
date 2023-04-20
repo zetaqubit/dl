@@ -16,4 +16,4 @@ GPT.n_layers = 8
 GPT.dim = 768
 GPT.max_seq_len = %max_seq_len
 
-SelfAttention.heads = 8
+Attention.heads = 8

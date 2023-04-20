@@ -14,7 +14,7 @@ from dl.data import tokenizers
 
 
 @gin.configurable
-class SelfAttention(nn.Module):
+class Attention(nn.Module):
   def __init__(self, dim: int, heads: int, causal=False, attn_bias=None):
     super().__init__()
     self.scaling_factor = dim ** -0.5
@@ -59,7 +59,7 @@ class TransformerBlock(nn.Module):
     super().__init__()
     dim_internal = dim * 4
     self.ln_1 = nn.LayerNorm(dim)
-    self.attention = SelfAttention(dim=dim, causal=causal)
+    self.attention = Attention(dim=dim, causal=causal)
     self.ln_2 = nn.LayerNorm(dim)
     self.ff = nn.Sequential(OrderedDict([
       ('ff1', nn.Linear(dim, dim_internal)),
