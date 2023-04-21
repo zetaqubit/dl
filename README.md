@@ -23,7 +23,7 @@ Implementations of different Deep Learning architectures and algorithms, using o
 - [x] Implement sinusoidal position embeddings
 - [x] Implement relative position bias a la T5
 - [ ] Implement RoPE embeddings
-- [ ] Add support for cross-attention, as used in NMT
+- [x] Add support for cross-attention, as used in NMT
 - [ ] Implement beam search decoding
 
 ## rnn

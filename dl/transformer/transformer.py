@@ -26,18 +26,23 @@ class Attention(nn.Module):
     self.to_v = nn.Linear(dim, dim)
     self.to_out = nn.Linear(dim, dim)  # to_out for special init
 
-  def forward(self, x):
+  def forward(self, x, y=None):
     """
     Args:
-      x: [batch, seq, dim]
+      x: Main sequence used to compute the query. Also defines the output len.
+         [batch, seq, dim]
+      y: Optional cross-attention sequence to compute the key and values.
+         If not supplied, falls back to x, becoming self-attention.
+         [batch, seq, dim]
     """
     device = x.device
+    if y is None: y = x
     q = self.to_q(x)
-    k = self.to_k(x)
-    v = self.to_v(x)
-    q = rearrange(q, 'b s (h d) -> b h s d', h=self.heads)
-    k = rearrange(k, 'b s (h d) -> b h s d', h=self.heads)
-    v = rearrange(v, 'b s (h d) -> b h s d', h=self.heads)
+    k = self.to_k(y)
+    v = self.to_v(y)
+    q = rearrange(q, 'b i (h d) -> b h i d', h=self.heads)
+    k = rearrange(k, 'b j (h d) -> b h j d', h=self.heads)
+    v = rearrange(v, 'b j (h d) -> b h j d', h=self.heads)
 
     dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scaling_factor
     if self.attn_bias is not None:
