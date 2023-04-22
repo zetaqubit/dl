@@ -3,7 +3,7 @@ import math
 from typing import Callable
 
 from collections import OrderedDict
-from einops import rearrange
+from einops import rearrange, repeat
 import gin
 import numpy as np
 import torch
@@ -156,6 +156,37 @@ class RelativePositionBias(nn.Module):
     rel_pos += self.max_rel_pos  # convert to range [0, 2 * max_rel_pos]
     pos_bias = self.bias[rel_pos]  # [s, s]
     return pos_bias
+
+
+# Rotary position embeddings, implemented efficiently as described in
+# https://arxiv.org/pdf/2104.09864.pdf, section 3.4.2.
+@gin.configurable
+class RotaryPositionEmbedding(nn.Module):
+  def __init__(self, max_seq_len: int, dim: int):
+    super().__init__()
+    self.max_seq_len = max_seq_len
+    inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))  # [d]
+    position = torch.arange(0, max_seq_len, dtype=torch.float)  # [s]
+    sinusoid = torch.einsum("s, d -> s d", position, inv_freq)  # [s, d]
+    sinusoid = repeat(sinusoid, 's d -> s (d j)', j=2)
+    self.cos_mult = sinusoid.cos()  # [s, d]
+    self.sin_mult = sinusoid.sin()  # [s, d]
+
+  def rotate_pairs(self, x):
+    x = rearrange(x, '... (d j) -> ... j d', j=2)
+    x1, x2 = x[..., 0, :], x[..., 1, :]
+    x = torch.stack((-x2, x1), dim=-2)
+    x = rearrange(x, '... j d -> ... (d j)', j=2)
+    return x
+
+  def forward(self, x):  # [..., s, d] -> [..., s, d]
+    _, seq, dim = x.shape
+    assert dim % 2 == 0
+    assert seq <= self.max_seq_len
+
+    x_rot = self.rotate_pairs(x)
+    rot = self.cos_mult * x + self.sin_mult * x_rot
+    return rot
 
 
 @gin.configurable
