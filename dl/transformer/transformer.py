@@ -135,12 +135,13 @@ class SinusoidalPositionEmbedding(nn.Module):
   def __init__(self, dim: int, max_seq_len: int):
     super().__init__()
     self.max_seq_len = max_seq_len
-    pos = torch.arange(0, max_seq_len)[:, None]
-    div = torch.arange(0, dim, 2) * math.log(10000) / dim
-    div = torch.exp(-div)
+    pos = torch.arange(0, max_seq_len, dtype=torch.float)  # [s]
+    inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))  # [d]
+    pos_emb = einsum('s, d -> s d', pos, inv_freq)
+
     self.register_buffer('emb', torch.zeros((max_seq_len, dim)))
-    self.emb[: , 0::2] = torch.sin(pos * div)
-    self.emb[: , 1::2] = torch.cos(pos * div)
+    self.emb[: , 0::2] = pos_emb.sin()
+    self.emb[: , 1::2] = pos_emb.cos()
 
   def forward(self, x):  # [b, s]  ->  [b, s, e]
     seq_len = x.shape[1]
