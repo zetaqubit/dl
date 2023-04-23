@@ -1,4 +1,5 @@
 """Implementation of the transformer from Attention is All You Need."""
+import functools
 import math
 from typing import Callable
 
@@ -15,12 +16,16 @@ from dl.data import tokenizers
 
 @gin.configurable
 class Attention(nn.Module):
-  def __init__(self, dim: int, heads: int, causal=False, attn_bias=None):
+  def __init__(self, dim: int, heads: int, causal=False, attn_bias=None,
+               rotary_emb=None):
     super().__init__()
+    assert dim % heads == 0
     self.scaling_factor = dim ** -0.5
     self.heads = heads
     self.causal = causal
     self.attn_bias = attn_bias
+    if rotary_emb:
+      self.rotary_emb = rotary_emb(dim=dim // heads)
     self.to_q = nn.Linear(dim, dim)
     self.to_k = nn.Linear(dim, dim)
     self.to_v = nn.Linear(dim, dim)
@@ -43,6 +48,9 @@ class Attention(nn.Module):
     q = rearrange(q, 'b i (h d) -> b h i d', h=self.heads)
     k = rearrange(k, 'b j (h d) -> b h j d', h=self.heads)
     v = rearrange(v, 'b j (h d) -> b h j d', h=self.heads)
+
+    if self.rotary_emb is not None:
+      q, k = map(self.rotary_emb, (q, k))
 
     dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scaling_factor
     if self.attn_bias is not None:
@@ -160,17 +168,27 @@ class RelativePositionBias(nn.Module):
 
 # Rotary position embeddings, implemented efficiently as described in
 # https://arxiv.org/pdf/2104.09864.pdf, section 3.4.2.
+@functools.lru_cache
 @gin.configurable
 class RotaryPositionEmbedding(nn.Module):
   def __init__(self, max_seq_len: int, dim: int):
     super().__init__()
     self.max_seq_len = max_seq_len
     inv_freq = 1. / (10000 ** (torch.arange(0, dim, 2).float() / dim))  # [d]
-    position = torch.arange(0, max_seq_len, dtype=torch.float)  # [s]
-    sinusoid = torch.einsum("s, d -> s d", position, inv_freq)  # [s, d]
-    sinusoid = repeat(sinusoid, 's d -> s (d j)', j=2)
-    self.cos_mult = sinusoid.cos()  # [s, d]
-    self.sin_mult = sinusoid.sin()  # [s, d]
+    pos = torch.arange(0, max_seq_len, dtype=torch.float)  # [s]
+    pos_emb = torch.einsum('s, d -> s d', pos, inv_freq)  # [s, d]
+    pos_emb = repeat(pos_emb, 's d -> s (d j)', j=2)
+    self.register_buffer('cos_mult', pos_emb.cos())  # [s, d]
+    self.register_buffer('sin_mult', pos_emb.sin())  # [s, d]
+
+  def forward(self, x):  # [..., s, d] -> [..., s, d]
+    *_, seq, dim = x.shape
+    assert seq <= self.max_seq_len, "input length > max_seq_len"
+    assert dim % 2 == 0
+
+    x_rot = self.rotate_pairs(x)
+    rot = self.cos_mult[:seq, :] * x + self.sin_mult[:seq, :] * x_rot
+    return rot
 
   def rotate_pairs(self, x):
     x = rearrange(x, '... (d j) -> ... j d', j=2)
@@ -178,15 +196,6 @@ class RotaryPositionEmbedding(nn.Module):
     x = torch.stack((-x2, x1), dim=-2)
     x = rearrange(x, '... j d -> ... (d j)', j=2)
     return x
-
-  def forward(self, x):  # [..., s, d] -> [..., s, d]
-    _, seq, dim = x.shape
-    assert dim % 2 == 0
-    assert seq <= self.max_seq_len
-
-    x_rot = self.rotate_pairs(x)
-    rot = self.cos_mult * x + self.sin_mult * x_rot
-    return rot
 
 
 @gin.configurable

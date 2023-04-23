@@ -1,0 +1,9 @@
+# Rotary position embeddings.
+
+# Sinusoidal embeddings for 1st layer.
+GPT.pos_emb_fn = @SinusoidalPositionEmbedding
+SinusoidalPositionEmbedding.max_seq_len = %max_seq_len
+
+# Rotary embedding apply to q and k at every layer.
+Attention.rotary_emb = @RotaryPositionEmbedding
+RotaryPositionEmbedding.max_seq_len = %max_seq_len
