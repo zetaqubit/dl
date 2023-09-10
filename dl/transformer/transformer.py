@@ -24,8 +24,7 @@ class Attention(nn.Module):
     self.heads = heads
     self.causal = causal
     self.attn_bias = attn_bias
-    if rotary_emb:
-      self.rotary_emb = rotary_emb(dim=dim // heads)
+    self.rotary_emb = rotary_emb(dim=dim // heads) if rotary_emb else None
     self.to_q = nn.Linear(dim, dim)
     self.to_k = nn.Linear(dim, dim)
     self.to_v = nn.Linear(dim, dim)
