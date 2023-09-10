@@ -1,0 +1,4 @@
+dataset = 'tinystories'
+MemoryMappedDataset.align_to_seq_start = True
+
+
