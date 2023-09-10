@@ -58,6 +58,8 @@ def prepare(dataset, tok_type):
   elif dataset == 'ptb':
     ds = hf_datasets.load_dataset('ptb_text_only')
     ds = ds.rename_column('sentence', 'text')
+  elif dataset == 'tinystories':
+    ds = hf_datasets.load_dataset('roneneldan/TinyStories')
   elif dataset == 'shakespeare':
     df = pd.read_csv('dl/data/tiny_shakespeare.txt', delimiter='\t', header=0,
                      names=['text'])
@@ -76,7 +78,7 @@ def prepare(dataset, tok_type):
   else:
     ds = hf_datasets.load_dataset(dataset)
 
-  if dataset in ('wikitext-103', 'ptb'):
+  if dataset in ('wikitext-103', 'ptb', 'tinystories'):
     # These datasets have a validation split, so just rename it.
     ds['val'] = ds.pop('validation')  # rename
   elif dataset in ('shakespeare', 'enwik8') or dataset.startswith('abc'):
